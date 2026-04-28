@@ -21,14 +21,15 @@ _qp_theme = st.query_params.get("theme", None)
 if _qp_theme in ("dark", "light"):
     st.session_state["theme"] = _qp_theme
 
+
 # ── Session state defaults ────────────────────────────────────────────────────
 _DEFAULTS: dict = {
     "theme":         "dark",
     "step":          0,
-    "platform":      "lichess",
+    "platform":      None,
     "username":      "",
-    "perspective":   "self",
-    "time_classes":  ["bullet", "blitz", "rapid"],
+    "perspective":   None,
+    "time_classes":  [],
     "stats":         None,
     "profile":       None,
     "diagnostic_md": None,
@@ -110,10 +111,13 @@ body, .stApp {{
     margin: 0; padding: 0;
 }}
 .block-container {{
-    padding: 56px 20px 48px !important;
+    padding: 80px 32px 56px !important;
     max-width: 100% !important;
 }}
 section[data-testid="stMain"] > div {{ padding: 0 !important; }}
+@media (max-width: 640px) {{
+    .block-container {{ padding: 72px 18px 48px !important; }}
+}}
 
 /* ── Fixed header ───────────────────────────────────────────────────────────── */
 .cs-header {{
@@ -210,21 +214,37 @@ section[data-testid="stMain"] > div {{ padding: 0 !important; }}
     font-size: 11px; color: {C["txtMuted"]}; margin-bottom: 28px;
 }}
 
-/* ── Tile grid ────────────────────────────────────────────────────────────────── */
-.cs-tiles-2 {{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }}
-.cs-tiles-4 {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }}
-.cs-tile {{
-    border: 2px solid {C["border"]}; border-radius:12px;
-    padding: 20px 14px; text-align:center; cursor:pointer;
-    background: {C["card"]}; color:{C["txt"]};
-    transition: all 0.18s;
-    display:flex; flex-direction:column; align-items:center; gap:8px;
+/* ── Tile zone marker — scopes the tile-button styling ─────────────────────── */
+.cs-tile-zone {{ display:none; }}
+
+/* Style buttons in the column block immediately after a tile-zone marker */
+.element-container:has(.cs-tile-zone) + .element-container [data-testid="stButton"] > button {{
+    height: 110px !important;
+    border-radius: 12px !important;
+    border: 2px solid {C["border"]} !important;
+    background: {C["card"]} !important;
+    color: {C["txt"]} !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.05em !important;
+    padding: 18px 14px !important;
+    transition: all 0.18s !important;
+    white-space: pre-wrap !important;
+    line-height: 1.4 !important;
 }}
-.cs-tile:hover {{ border-color:{C["primary"]}; }}
-.cs-tile.sel {{
-    background:{C["primary"]}; border-color:{C["primary"]};
-    color:#fff; box-shadow: 0 4px 16px {C["primary"]}40;
+.element-container:has(.cs-tile-zone) + .element-container [data-testid="stButton"] > button:hover {{
+    border-color: {C["primary"]} !important;
+    color: {C["txt"]} !important;
 }}
+.element-container:has(.cs-tile-zone) + .element-container [data-testid="stButton"] > button[kind="primary"] {{
+    background: {C["primary"]} !important;
+    color: #fff !important;
+    border-color: {C["primary"]} !important;
+    box-shadow: 0 4px 16px {C["primary"]}40 !important;
+}}
+/* Tile rows: small vertical breath between rows in 2x2 step */
+.cs-tile-row-gap {{ height:14px; }}
 .cs-tile-icon   {{ font-size:32px; }}
 .cs-tile-iconsm {{ font-size:26px; }}
 .cs-tile-lbl {{
@@ -266,7 +286,7 @@ section[data-testid="stMain"] > div {{ padding: 0 !important; }}
     font-weight:600 !important; letter-spacing:0.08em !important;
 }}
 
-/* Tile backer buttons — collapsed by JS after wiring click handlers */
+/* (Legacy backing-button collapse, kept for safety) */
 .cs-tile-backer {{
     height:0 !important; overflow:hidden !important;
     margin:0 !important; padding:0 !important;
@@ -289,18 +309,26 @@ section[data-testid="stMain"] > div {{ padding: 0 !important; }}
     border:none !important; background:transparent !important;
 }}
 [data-testid="stTextInput"] input {{
-    background:transparent !important;
-    border:none !important;
-    border-bottom:2px solid {C["primary"]} !important;
-    border-radius:0 !important;
-    font-family:Georgia,'Times New Roman',serif !important;
-    font-size:22px !important; color:{C["txt"]} !important;
-    text-align:center !important; padding:8px 0 !important;
-    box-shadow:none !important; outline:none !important;
+    background: #ffffff !important;
+    border: 2px solid {C["border"]} !important;
+    border-radius: 10px !important;
+    font-family: Georgia,'Times New Roman',serif !important;
+    font-size: 20px !important;
+    color: #111111 !important;
+    -webkit-text-fill-color: #111111 !important;
+    caret-color: {C["primary"]} !important;
+    text-align: center !important;
+    padding: 14px 16px !important;
+    box-shadow: none !important; outline: none !important;
+}}
+[data-testid="stTextInput"] input::placeholder {{
+    color: #888888 !important;
+    opacity: 1;
 }}
 [data-testid="stTextInput"] input:focus {{
-    box-shadow:none !important; outline:none !important;
-    border-bottom:2px solid {C["primary"]} !important;
+    box-shadow: 0 0 0 3px {C["primary"]}30 !important;
+    outline: none !important;
+    border: 2px solid {C["primary"]} !important;
 }}
 
 /* ── Progress ─────────────────────────────────────────────────────────────────── */
@@ -764,23 +792,36 @@ def _section_lbl(text: str) -> str:
 
 # ── JS: wire tile clicks to backing buttons ───────────────────────────────────
 def _inject_tile_js():
-    """Wire .cs-tile divs to the invisible backing st.button via JS in parent frame."""
+    """Wire .cs-tile divs to the invisible backing st.button (same column) via JS."""
     components.html("""
     <script>
     (function() {
         var doc = window.parent.document;
+        function findBtn(tile) {
+            // Try column scope first (st.columns wraps each col in [data-testid="column"])
+            var col = tile.closest('[data-testid="column"]');
+            if (col) {
+                var btn = col.querySelector('[data-testid="stButton"] button');
+                if (btn) return btn;
+            }
+            // Fallback: next sibling element-container with button
+            var ec = tile.closest('.element-container');
+            if (ec && ec.nextElementSibling) {
+                var b = ec.nextElementSibling.querySelector('button');
+                if (b) return b;
+            }
+            return null;
+        }
         function wireUp() {
             doc.querySelectorAll('.cs-tile:not([data-wired])').forEach(function(tile) {
+                var btn = findBtn(tile);
+                if (!btn) return;
                 tile.setAttribute('data-wired', '1');
                 tile.style.cursor = 'pointer';
-                var tileEl = tile.closest('.element-container');
-                if (!tileEl) return;
-                var btnEl = tileEl.nextElementSibling;
-                if (!btnEl) return;
-                var btn = btnEl.querySelector('button');
-                if (!btn) return;
-                btnEl.classList.add('cs-tile-backer');
-                tile.addEventListener('click', function() { btn.click(); });
+                tile.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    btn.click();
+                });
             });
         }
         wireUp();
@@ -900,43 +941,32 @@ def _nav(back_key: str, next_key: str, next_label: str = "Próximo →",
 # ── Wizard steps ──────────────────────────────────────────────────────────────
 
 def render_step_platform():
+    plat = st.session_state.platform
     st.markdown(
         '<div class="cs-wizard-card">'
         '<div class="cs-wiz-icon">♜</div>'
         '<div class="cs-wiz-title">Escolha a Plataforma</div>'
-        '<div class="cs-wiz-sub">Em qual plataforma este jogador tem conta?</div>'
-        '<div class="cs-tiles-2">',
+        '<div class="cs-wiz-sub">Em qual plataforma este jogador tem conta?</div>',
         unsafe_allow_html=True,
     )
-    col1, col2 = st.columns(2, gap="small")
+
+    st.markdown('<div class="cs-tile-zone"></div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2, gap="medium")
     with col1:
-        sel = st.session_state.platform == "chesscom"
-        st.markdown(
-            f'<div class="cs-tile {"sel" if sel else ""}" style="pointer-events:none">'
-            '<div class="cs-tile-icon">♟</div>'
-            '<div class="cs-tile-lbl">Chess.com</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Chess.com", key="plat_cc", use_container_width=True):
+        if st.button("♟  Chess.com", key="plat_cc",
+                     type=("primary" if plat == "chesscom" else "secondary"),
+                     use_container_width=True):
             st.session_state.platform = "chesscom"
             st.rerun()
     with col2:
-        sel = st.session_state.platform == "lichess"
-        st.markdown(
-            f'<div class="cs-tile {"sel" if sel else ""}" style="pointer-events:none">'
-            '<div class="cs-tile-icon">♞</div>'
-            '<div class="cs-tile-lbl">Lichess</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Lichess", key="plat_lc", use_container_width=True):
+        if st.button("♞  Lichess", key="plat_lc",
+                     type=("primary" if plat == "lichess" else "secondary"),
+                     use_container_width=True):
             st.session_state.platform = "lichess"
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)  # close tiles-2
 
     _back, nxt = _nav("back0", "next0", show_back=False,
-                      next_disabled=(st.session_state.platform is None))
+                      next_disabled=(plat is None))
     if nxt:
         st.session_state.step = 1
         st.rerun()
@@ -944,12 +974,13 @@ def render_step_platform():
 
 
 def render_step_username():
+    plat_name = "Chess.com" if st.session_state.platform == "chesscom" else "Lichess"
     placeholder = "ex: magnuscarlsen" if st.session_state.platform == "chesscom" else "ex: DrNykterstein"
     st.markdown(
         '<div class="cs-wizard-card">'
         '<div class="cs-wiz-icon">♙</div>'
         '<div class="cs-wiz-title">Nome de Usuário</div>'
-        '<div class="cs-wiz-sub">Digite o usuário no Chess.com / Lichess</div>',
+        f'<div class="cs-wiz-sub">Digite o usuário no {plat_name}</div>',
         unsafe_allow_html=True,
     )
     uname = st.text_input(
@@ -973,6 +1004,7 @@ def render_step_username():
 
 
 def render_step_perspective():
+    persp = st.session_state.perspective
     st.markdown(
         '<div class="cs-wizard-card">'
         '<div class="cs-wiz-icon">♔</div>'
@@ -980,36 +1012,24 @@ def render_step_perspective():
         '<div class="cs-wiz-sub">Sua resposta define o relatório gerado</div>',
         unsafe_allow_html=True,
     )
-    col1, col2 = st.columns(2, gap="small")
+
+    st.markdown('<div class="cs-tile-zone"></div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2, gap="medium")
     with col1:
-        sel = st.session_state.perspective == "self"
-        st.markdown(
-            f'<div class="cs-tile {"sel" if sel else ""}" style="pointer-events:none">'
-            '<div class="cs-tile-icon">♔</div>'
-            '<div class="cs-tile-lbl">Sou eu</div>'
-            '<div class="cs-tile-sub">Diagnóstico pessoal\ne plano de melhoria</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Sou eu", key="persp_self", use_container_width=True):
+        if st.button("♔  Sou eu", key="persp_self",
+                     type=("primary" if persp == "self" else "secondary"),
+                     use_container_width=True):
             st.session_state.perspective = "self"
             st.rerun()
     with col2:
-        sel = st.session_state.perspective == "opponent"
-        st.markdown(
-            f'<div class="cs-tile {"sel" if sel else ""}" style="pointer-events:none">'
-            '<div class="cs-tile-icon">♚</div>'
-            '<div class="cs-tile-lbl">Meu adversário</div>'
-            '<div class="cs-tile-sub">Guia para vencer\neste jogador</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Meu adversário", key="persp_opp", use_container_width=True):
+        if st.button("♚  Adversário", key="persp_opp",
+                     type=("primary" if persp == "opponent" else "secondary"),
+                     use_container_width=True):
             st.session_state.perspective = "opponent"
             st.rerun()
 
     back, nxt = _nav("back2", "next2",
-                     next_disabled=(st.session_state.perspective is None))
+                     next_disabled=(persp is None))
     if back:
         st.session_state.step = 1
         st.rerun()
@@ -1027,6 +1047,7 @@ _GAME_TYPES = [
 ]
 
 def render_step_gametype():
+    tc = st.session_state.time_classes
     st.markdown(
         '<div class="cs-wizard-card">'
         '<div class="cs-wiz-icon">⏱</div>'
@@ -1034,23 +1055,16 @@ def render_step_gametype():
         '<div class="cs-wiz-sub">Selecione um ou mais</div>',
         unsafe_allow_html=True,
     )
-    col1, col2 = st.columns(2, gap="small")
-    pairs = [(_GAME_TYPES[0], _GAME_TYPES[2]), (_GAME_TYPES[1], _GAME_TYPES[3])]
-    tc = st.session_state.time_classes
 
-    for (top, bot), col in zip(pairs, [col1, col2]):
-        with col:
-            for cat, icon, lbl, sub in (top, bot):
-                sel = cat in tc
-                st.markdown(
-                    f'<div class="cs-tile {"sel" if sel else ""}" style="pointer-events:none">'
-                    f'<div class="cs-tile-iconsm">{icon}</div>'
-                    f'<div class="cs-tile-lbl">{lbl}</div>'
-                    f'<div class="cs-tile-sub">{sub}</div>'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
-                if st.button(lbl, key=f"tc_{cat}", use_container_width=True):
+    rows = [(_GAME_TYPES[0], _GAME_TYPES[1]), (_GAME_TYPES[2], _GAME_TYPES[3])]
+    for row_idx, (left, right) in enumerate(rows):
+        st.markdown('<div class="cs-tile-zone"></div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2, gap="medium")
+        for (cat, icon, lbl, sub), col in zip((left, right), (c1, c2)):
+            with col:
+                btn_type = "primary" if cat in tc else "secondary"
+                if st.button(f"{icon}  {lbl}", key=f"tc_{cat}",
+                             type=btn_type, use_container_width=True):
                     new_tc = list(tc)
                     if cat in new_tc:
                         new_tc.remove(cat)
@@ -1058,6 +1072,8 @@ def render_step_gametype():
                         new_tc.append(cat)
                     st.session_state.time_classes = new_tc
                     st.rerun()
+        if row_idx == 0:
+            st.markdown('<div class="cs-tile-row-gap"></div>', unsafe_allow_html=True)
 
     back, nxt = _nav("back3", "next3",
                      next_label="♞ Analisar",
@@ -1094,6 +1110,30 @@ def _prog_html(msg: str, pct: int) -> str:
 </div>"""
 
 
+def _locked_tiles_html(tc: list[str]) -> str:
+    """Read-only 2x2 grid showing the user's gametype selection during analysis."""
+    rows = [(_GAME_TYPES[0], _GAME_TYPES[1]), (_GAME_TYPES[2], _GAME_TYPES[3])]
+    out = ""
+    for row_idx, (left, right) in enumerate(rows):
+        out += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
+        for cat, icon, lbl, _sub in (left, right):
+            sel = cat in tc
+            bg = C["primary"] if sel else C["card"]
+            color = "#fff" if sel else C["txt"]
+            bdr = C["primary"] if sel else C["border"]
+            shadow = (f"box-shadow:0 4px 16px {C['primary']}40;" if sel else "")
+            out += (
+                f'<div style="height:110px;border-radius:12px;border:2px solid {bdr};'
+                f'background:{bg};color:{color};display:flex;align-items:center;'
+                f'justify-content:center;font-family:\'Courier New\',Courier,monospace;'
+                f'font-size:15px;font-weight:700;letter-spacing:0.05em;{shadow}">'
+                f'{icon}  {lbl}'
+                '</div>'
+            )
+        out += '</div>'
+    return out
+
+
 def run_analysis():
     username   = st.session_state.username
     platform   = st.session_state.platform
@@ -1101,8 +1141,10 @@ def run_analysis():
 
     st.markdown(
         '<div class="cs-wizard-card">'
-        '<div class="cs-wiz-icon">♟</div>'
-        f'<div class="cs-wiz-title">Analisando {username}…</div>',
+        '<div class="cs-wiz-icon">⏱</div>'
+        '<div class="cs-wiz-title">Tipo de Partida</div>'
+        '<div class="cs-wiz-sub">Selecione um ou mais</div>'
+        + _locked_tiles_html(st.session_state.time_classes or []),
         unsafe_allow_html=True,
     )
     prog = st.empty()
@@ -1912,22 +1954,20 @@ if st.session_state.stats:
     render_player_card()
 
     # Native tab bar
-    _tab_labels = ["Resumo", "Visão Geral", "Erros", "Aberturas", "Relatório"]
+    _tab_labels = ["Visão Geral", "Erros", "Aberturas", "Relatório"]
     _tabs = st.tabs(_tab_labels)
     with _tabs[0]:
-        render_tab_summary()
-    with _tabs[1]:
         render_tab_overview()
-    with _tabs[2]:
+    with _tabs[1]:
         render_tab_errors()
-    with _tabs[3]:
+    with _tabs[2]:
         render_tab_openings()
-    with _tabs[4]:
+    with _tabs[3]:
         render_tab_report()
 
     # Reset button
     st.markdown('<div class="cs-reset-wrap">', unsafe_allow_html=True)
-    if st.button("← Analisar outro jogador", key="reset_btn", type="secondary"):
+    if st.button("← Analisar Outro Jogador", key="reset_btn", type="secondary"):
         for k, v in _DEFAULTS.items():
             st.session_state[k] = v
         st.rerun()
@@ -1955,7 +1995,6 @@ else:
         render_step_perspective()
     elif step == 3:
         render_step_gametype()
-    _inject_tile_js()   # wire HTML tile divs → backing buttons
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div></div>', unsafe_allow_html=True)  # close cs-main + cs-page
