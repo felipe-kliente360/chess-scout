@@ -16,20 +16,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── Theme from query param (toggled by HTML anchor in header) ─────────────────
-_qp_theme = st.query_params.get("theme", None)
-if _qp_theme in ("dark", "light"):
-    st.session_state["theme"] = _qp_theme
+# ── Lang from query param ─────────────────────────────────────────────────────
+_qp_lang = st.query_params.get("lang", None)
+if _qp_lang in ("pt", "en"):
+    st.session_state["lang"] = _qp_lang
 
 
 # ── Session state defaults ────────────────────────────────────────────────────
 _DEFAULTS: dict = {
-    "theme":         "dark",
+    "lang":          "pt",
     "step":          0,
-    "platform":      None,
+    "platform":      "chesscom",
     "username":      "",
-    "perspective":   None,
-    "time_classes":  [],
+    "perspective":   "self",
+    "time_classes":  ["blitz"],
     "stats":         None,
     "profile":       None,
     "diagnostic_md": None,
@@ -38,63 +38,40 @@ _DEFAULTS: dict = {
     "analyze_pct":   0,
     "analyze_msg":   "",
     "analyze_error": "",
+    "result_step":   "overview",
 }
 for _k, _v in _DEFAULTS.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# ── Color palettes ────────────────────────────────────────────────────────────
-DARK: dict = {
-    "bg":        "#111827",
-    "surface":   "#1a2535",
-    "card":      "#1f2d3f",
-    "border":    "#2e4058",
-    "borderMid": "#3a5070",
-    "primary":   "#4e8ecb",
-    "green":     "#4aaa6e",
-    "greenBg":   "#0e2a1a",
-    "greenBdr":  "#1e4a30",
-    "red":       "#e05252",
-    "redBg":     "#2a0e0e",
-    "redBdr":    "#4a1e1e",
-    "gold":      "#d4a843",
-    "amber":     "#d4843a",
-    "slate":     "#7090a8",
-    "txt":       "#dce8f5",
-    "txtMid":    "#8faabf",
-    "txtMuted":  "#4e6880",
-    "headerBg":  "#0d1520",
-    "footerBg":  "#0d1520",
-}
-LIGHT: dict = {
-    "bg":        "#f4f0e8",
-    "surface":   "#faf7f2",
-    "card":      "#ffffff",
-    "border":    "#ddd5c4",
-    "borderMid": "#c8bfae",
-    "primary":   "#1e4a7a",
-    "green":     "#2a6e42",
-    "greenBg":   "#edf7f2",
-    "greenBdr":  "#a8d5bc",
-    "red":       "#8b2222",
-    "redBg":     "#fdf0f0",
-    "redBdr":    "#e8b8b8",
-    "gold":      "#a07030",
-    "amber":     "#9a5a18",
-    "slate":     "#607080",
-    "txt":       "#1a1a1a",
-    "txtMid":    "#4a3c2e",
-    "txtMuted":  "#8a7a68",
-    "headerBg":  "#1e4a7a",
-    "footerBg":  "#f0ece4",
+# ── Design tokens — Dossiê ────────────────────────────────────────────────────
+DOSSIE: dict = {
+    "bg":          "#f3ede0",
+    "paper":       "#faf6ec",
+    "paperEdge":   "#e7dfcc",
+    "ink":         "#1c1a14",
+    "inkMid":      "#3a3528",
+    "inkMuted":    "#7a6f55",
+    "inkFaint":    "#a89d80",
+    "border":      "#d5cab0",
+    "borderMid":   "#c0b390",
+    "red":         "#a8281e",
+    "redBg":       "#f3dcd6",
+    "redBdr":      "#d4a09a",
+    "green":       "#3a6b2a",
+    "greenBg":     "#dff0d8",
+    "greenBdr":    "#a8d5a0",
+    "amber":       "#a8702a",
+    "amberBg":     "#f5e8d0",
 }
 
-C  = DARK  if st.session_state.theme == "dark" else LIGHT
-SH = "0 8px 32px #00000050" if st.session_state.theme == "dark" else "0 4px 20px #00000012"
+C = DOSSIE
 
 # ── CSS injection ─────────────────────────────────────────────────────────────
 st.markdown(f"""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
 /* ── Reset Streamlit chrome ────────────────────────────────────────────────── */
 #MainMenu, footer, header {{ display:none !important; }}
 [data-testid="stSidebar"]       {{ display:none !important; }}
@@ -103,574 +80,541 @@ st.markdown(f"""
 .stDeployButton                 {{ display:none !important; }}
 [data-testid="stToolbar"]       {{ display:none !important; }}
 
-/* ── Global ─────────────────────────────────────────────────────────────────── */
+/* ── Global ──────────────────────────────────────────────────────────────────── */
 body, .stApp {{
     background: {C["bg"]} !important;
-    font-family: 'Courier New', Courier, monospace;
-    color: {C["txt"]};
+    font-family: 'Inter', system-ui, sans-serif;
+    color: {C["ink"]};
     margin: 0; padding: 0;
+    min-height: 100dvh;
 }}
 .block-container {{
-    padding: 80px 32px 56px !important;
+    padding: clamp(72px,9vw,88px) clamp(12px,4vw,32px) 56px !important;
     max-width: 100% !important;
 }}
 section[data-testid="stMain"] > div {{ padding: 0 !important; }}
-@media (max-width: 640px) {{
-    .block-container {{ padding: 72px 18px 48px !important; }}
-}}
 
-/* ── Fixed header ───────────────────────────────────────────────────────────── */
-.cs-header {{
+/* ── Fixed header ─────────────────────────────────────────────────────────── */
+.ds-header {{
     position: fixed; top:0; left:0; right:0;
-    height: 56px;
-    background: {C["headerBg"]};
+    height: 52px;
+    background: {C["bg"]};
     border-bottom: 1px solid {C["border"]};
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0 24px;
+    padding: 0 clamp(16px,4vw,28px);
     z-index: 9999;
 }}
-.cs-header-left {{
-    display: flex; align-items: center; gap: 10px;
+.ds-header-left {{ display: flex; align-items: center; gap: 10px; }}
+.ds-logo {{ font-size: 20px; color: {C["ink"]}; }}
+.ds-title {{
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(13px,2.5vw,16px); font-weight: 700;
+    letter-spacing: 0.25em; color: {C["ink"]}; text-transform: uppercase;
 }}
-.cs-logo {{ font-size: 22px; color: #fff; }}
-.cs-title {{
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px; font-weight: bold;
-    letter-spacing: 0.3em; color: #fff;
+.ds-lang-btn {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: {C["inkMuted"]};
+    background: transparent;
+    border: 1px solid {C["border"]};
+    border-radius: 4px; padding: 5px 10px;
+    text-decoration: none; transition: border-color 0.2s;
 }}
-.cs-subtitle {{
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 9px; color: #ffffff50; margin-left: 4px;
-}}
+.ds-lang-btn:hover {{ border-color:{C["borderMid"]}; color:{C["inkMid"]}; }}
 
-/* ── Page scaffold ──────────────────────────────────────────────────────────── */
-.cs-page, .cs-main {{ display: contents; }}
-.cs-wizard-wrap  {{ width:100%; max-width:520px; margin:0 auto; }}
-.cs-results-wrap {{ width:100%; max-width:800px; margin:0 auto; }}
+/* ── Page scaffold ─────────────────────────────────────────────────────────── */
+.ds-wizard-wrap  {{ width:100%; max-width:520px; margin:0 auto; padding: 0 4px; }}
+.ds-results-wrap {{ width:100%; max-width:880px; margin:0 auto; }}
 
-/* ── Footer ─────────────────────────────────────────────────────────────────── */
-.cs-footer {{
-    background: {C["footerBg"]};
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+.ds-footer {{
     border-top: 1px solid {C["border"]};
     padding: 14px 22px; text-align: center;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 10px; color: {C["txtMuted"]}; letter-spacing: 0.22em;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: {C["inkFaint"]}; letter-spacing: 0.18em;
+    background: {C["bg"]};
 }}
 
-/* ── Stepper ─────────────────────────────────────────────────────────────────── */
-.cs-step-label {{
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 10px; color: {C["txtMuted"]};
+/* ── Stepper ───────────────────────────────────────────────────────────────── */
+.ds-step-label {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: {C["inkFaint"]};
     letter-spacing: 0.22em; text-transform: uppercase;
-    text-align: center; margin-bottom: 20px;
+    text-align: center; margin-bottom: 16px;
 }}
-.cs-stepper {{
+.ds-stepper {{
     display: flex; align-items: center;
-    justify-content: center; margin-bottom: 32px;
+    justify-content: center; margin-bottom: 28px; gap: 0;
 }}
-.cs-step-node {{
+.ds-step-node {{
     display: flex; flex-direction: column;
-    align-items: center; gap: 6px;
+    align-items: center; gap: 5px;
 }}
-.cs-step-circle {{
-    width: 34px; height: 34px; border-radius: 50%;
+.ds-step-circle {{
+    width: 32px; height: 32px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px; font-weight: bold;
-    border: 2px solid;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 500;
+    border: 1.5px solid;
 }}
-.cs-circle-done   {{ background:{C["primary"]}; color:#fff; border-color:{C["primary"]}; }}
-.cs-circle-active {{ background:transparent; color:{C["primary"]}; border-color:{C["primary"]}; }}
-.cs-circle-future {{ background:transparent; color:{C["txtMuted"]}; border-color:{C["border"]}; }}
-.cs-step-name {{
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 9px; letter-spacing: 0.1em;
+.ds-circle-done   {{ background:{C["ink"]};    color:{C["paper"]};    border-color:{C["ink"]}; }}
+.ds-circle-active {{ background:transparent;   color:{C["red"]};      border-color:{C["red"]}; }}
+.ds-circle-future {{ background:transparent;   color:{C["inkFaint"]}; border-color:{C["border"]}; }}
+.ds-step-name {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; letter-spacing: 0.08em; color: {C["inkFaint"]};
 }}
-.cs-name-active  {{ color:{C["primary"]}; }}
-.cs-name-inactive{{ color:{C["txtMuted"]}; }}
-.cs-connector {{
-    width:36px; height:2px; margin-bottom:22px; flex-shrink:0;
+.ds-name-active  {{ color:{C["red"]}; }}
+.ds-connector {{
+    width: 28px; height: 1px; margin-bottom: 20px; flex-shrink: 0;
 }}
-.cs-conn-done    {{ background:{C["primary"]}; }}
-.cs-conn-pending {{ background:{C["border"]}; }}
+.ds-conn-done    {{ background:{C["ink"]}; }}
+.ds-conn-pending {{ background:{C["border"]}; }}
 
-/* ── Wizard card ─────────────────────────────────────────────────────────────── */
-.cs-wizard-card {{
-    background: {C["card"]};
-    border: 1px solid {C["border"]};
-    border-radius: 18px;
-    box-shadow: {SH};
-    padding: 42px 44px;
+/* ── Paper card (wizard + results) ────────────────────────────────────────── */
+.ds-paper {{
+    background: {C["paper"]};
+    border: 1px solid {C["paperEdge"]};
+    border-radius: 4px;
+    padding: clamp(24px,5vw,44px) clamp(20px,5vw,44px);
     text-align: center;
+    margin-bottom: 16px;
 }}
-.cs-wiz-icon  {{ font-size:36px; margin-bottom:12px; }}
-.cs-wiz-title {{
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 17px; font-weight: bold;
-    color: {C["txt"]}; margin-bottom: 8px;
+.ds-paper-left {{ text-align: left; }}
+.ds-wiz-icon  {{ font-size: 34px; margin-bottom: 10px; }}
+.ds-wiz-title {{
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(20px,5vw,28px); font-weight: 700;
+    color: {C["ink"]}; margin-bottom: 6px; line-height: 1.2;
 }}
-.cs-wiz-sub {{
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 11px; color: {C["txtMuted"]}; margin-bottom: 28px;
+.ds-wiz-sub {{
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px; color: {C["inkMuted"]}; margin-bottom: 26px;
 }}
 
-/* ── Tile zone marker — scopes the tile-button styling ─────────────────────── */
+/* ── Tile zone ─────────────────────────────────────────────────────────────── */
 .cs-tile-zone {{ display:none; }}
 
-/* Style buttons in the column block immediately after a tile-zone marker */
 .element-container:has(.cs-tile-zone) + .element-container [data-testid="stButton"] > button {{
-    height: 110px !important;
-    border-radius: 12px !important;
-    border: 2px solid {C["border"]} !important;
-    background: {C["card"]} !important;
-    color: {C["txt"]} !important;
-    font-family: 'Courier New', Courier, monospace !important;
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.05em !important;
-    padding: 18px 14px !important;
-    transition: all 0.18s !important;
+    height: 108px !important;
+    border-radius: 4px !important;
+    border: 1.5px solid {C["border"]} !important;
+    background: {C["paper"]} !important;
+    color: {C["ink"]} !important;
+    font-family: 'Inter', system-ui !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.01em !important;
+    padding: 16px 12px !important;
+    transition: border-color 0.15s, background 0.15s !important;
     white-space: pre-wrap !important;
     line-height: 1.4 !important;
 }}
 .element-container:has(.cs-tile-zone) + .element-container [data-testid="stButton"] > button:hover {{
-    border-color: {C["primary"]} !important;
-    color: {C["txt"]} !important;
+    border-color: {C["borderMid"]} !important;
+    background: {C["bg"]} !important;
 }}
 .element-container:has(.cs-tile-zone) + .element-container [data-testid="stButton"] > button[kind="primary"] {{
-    background: {C["primary"]} !important;
-    color: #fff !important;
-    border-color: {C["primary"]} !important;
-    box-shadow: 0 4px 16px {C["primary"]}40 !important;
+    background: {C["redBg"]} !important;
+    color: {C["red"]} !important;
+    border-color: {C["red"]} !important;
+    border-width: 1.5px !important;
 }}
-/* Tile rows: small vertical breath between rows in 2x2 step */
-.cs-tile-row-gap {{ height:14px; }}
-.cs-tile-icon   {{ font-size:32px; }}
-.cs-tile-iconsm {{ font-size:26px; }}
+.cs-tile-row-gap {{ height: 12px; }}
+.cs-tile-icon    {{ font-size: 30px; }}
+.cs-tile-iconsm  {{ font-size: 24px; }}
 .cs-tile-lbl {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:13px; font-weight:bold;
+    font-family: 'Inter', system-ui; font-size: 13px; font-weight: 600;
+    color: {C["ink"]};
 }}
 .cs-tile-sub {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:11px; color:{C["txtMuted"]}; white-space:pre-line; line-height:1.4;
+    font-family: 'Inter', system-ui; font-size: 11px;
+    color: {C["inkMuted"]}; white-space: pre-line; line-height: 1.4;
 }}
-.cs-tile.sel .cs-tile-sub {{ color:#ffffff80; }}
 
-/* ── Nav buttons row ─────────────────────────────────────────────────────────── */
-.cs-nav {{ display:flex; justify-content:space-between; align-items:center; margin-top:44px; }}
-.cs-nav-ph {{ min-width:80px; }}
-
-/* Streamlit buttons — kind-based selectors (wrapper divs are siblings, not parents) */
+/* ── Streamlit buttons global ──────────────────────────────────────────────── */
 [data-testid="stButton"] > button {{
-    border-radius: 8px !important;
-    font-family: 'Courier New',Courier,monospace !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.08em !important;
-    transition: opacity 0.2s !important;
+    border-radius: 4px !important;
+    font-family: 'Inter', system-ui !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.02em !important;
+    transition: opacity 0.15s !important;
+    min-height: 44px !important;
 }}
 [data-testid="stButton"] > button[kind="primary"] {{
-    height:42px !important; padding:0 22px !important; font-size:13px !important;
-    background:{C["primary"]} !important; color:#fff !important; border:none !important;
+    height: 44px !important; padding: 0 24px !important; font-size: 14px !important;
+    background: {C["ink"]} !important; color: {C["paper"]} !important;
+    border: none !important;
+}}
+[data-testid="stButton"] > button[kind="primary"]:hover {{
+    opacity: 0.88 !important;
 }}
 [data-testid="stButton"] > button[kind="secondary"] {{
-    height:42px !important; padding:0 22px !important; font-size:13px !important;
-    background:transparent !important; color:{C["txtMuted"]} !important;
-    border:1px solid {C["border"]} !important;
+    height: 44px !important; padding: 0 22px !important; font-size: 13px !important;
+    background: transparent !important; color: {C["inkMuted"]} !important;
+    border: 1px solid {C["border"]} !important;
 }}
 [data-testid="stDownloadButton"] > button {{
-    height:32px !important; padding:0 14px !important; font-size:11px !important;
-    background:{C["primary"]} !important; color:#fff !important; border:none !important;
-    border-radius:8px !important;
-    font-family:'Courier New',Courier,monospace !important;
-    font-weight:600 !important; letter-spacing:0.08em !important;
+    height: 36px !important; padding: 0 16px !important; font-size: 12px !important;
+    background: {C["ink"]} !important; color: {C["paper"]} !important;
+    border: none !important; border-radius: 4px !important;
+    font-family: 'Inter', system-ui !important;
+    font-weight: 500 !important;
 }}
 
-/* (Legacy backing-button collapse, kept for safety) */
+/* Legacy tile backer */
 .cs-tile-backer {{
-    height:0 !important; overflow:hidden !important;
-    margin:0 !important; padding:0 !important;
+    height: 0 !important; overflow: hidden !important;
+    margin: 0 !important; padding: 0 !important;
 }}
 
-/* Theme toggle anchor in fixed header */
-.cs-theme-btn {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:12px; color:rgba(255,255,255,0.9);
-    background:rgba(255,255,255,0.1);
-    border:1px solid rgba(255,255,255,0.2);
-    border-radius:20px; padding:8px 14px;
-    text-decoration:none; display:inline-flex; align-items:center;
-    transition:background 0.2s;
-}}
-.cs-theme-btn:hover {{ background:rgba(255,255,255,0.2); color:#fff; }}
-
-/* ── Text input ───────────────────────────────────────────────────────────────── */
+/* ── Text input ────────────────────────────────────────────────────────────── */
 [data-testid="stTextInput"] > div > div {{
-    border:none !important; background:transparent !important;
+    border: none !important; background: transparent !important;
 }}
 [data-testid="stTextInput"] input {{
-    background: #ffffff !important;
-    border: 2px solid {C["border"]} !important;
-    border-radius: 10px !important;
-    font-family: Georgia,'Times New Roman',serif !important;
-    font-size: 20px !important;
-    color: #111111 !important;
-    -webkit-text-fill-color: #111111 !important;
-    caret-color: {C["primary"]} !important;
+    background: {C["paper"]} !important;
+    border: 1.5px solid {C["border"]} !important;
+    border-radius: 4px !important;
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: clamp(18px,4vw,22px) !important;
+    color: {C["ink"]} !important;
+    -webkit-text-fill-color: {C["ink"]} !important;
+    caret-color: {C["red"]} !important;
     text-align: center !important;
     padding: 14px 16px !important;
     box-shadow: none !important; outline: none !important;
 }}
-[data-testid="stTextInput"] input::placeholder {{
-    color: #888888 !important;
-    opacity: 1;
-}}
+[data-testid="stTextInput"] input::placeholder {{ color: {C["inkFaint"]} !important; opacity:1; }}
 [data-testid="stTextInput"] input:focus {{
-    box-shadow: 0 0 0 3px {C["primary"]}30 !important;
-    outline: none !important;
-    border: 2px solid {C["primary"]} !important;
+    border-color: {C["red"]} !important;
+    box-shadow: 0 0 0 3px {C["redBg"]} !important;
 }}
 
-/* ── Progress ─────────────────────────────────────────────────────────────────── */
-.cs-prog-status {{
-    display:flex; justify-content:space-between;
-    font-family:'Courier New',Courier,monospace; font-size:11px;
-    margin-bottom:8px;
+/* ── Progress (loading screen) ─────────────────────────────────────────────── */
+.ds-prog-wrap {{
+    background: {C["paper"]};
+    border: 1px solid {C["paperEdge"]};
+    border-radius: 4px;
+    padding: clamp(24px,5vw,40px) clamp(20px,5vw,40px);
 }}
-.cs-prog-msg {{ color:{C["txtMuted"]}; }}
-.cs-prog-pct {{ color:{C["primary"]}; font-weight:bold; }}
-.cs-prog-bar {{
-    height:5px; background:{C["surface"]};
-    border:1px solid {C["border"]}; border-radius:3px; overflow:hidden;
+.ds-prog-title {{
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(20px,5vw,26px); color: {C["ink"]}; margin-bottom: 6px;
 }}
-.cs-prog-fill {{
-    height:100%; background:{C["primary"]}; transition:width 0.7s ease;
+.ds-prog-sub {{
+    font-family: 'Inter', system-ui; font-size: 12px;
+    color: {C["inkMuted"]}; margin-bottom: 24px;
 }}
-.cs-prog-pieces {{
-    display:flex; justify-content:center; gap:12px;
-    margin-top:28px; font-size:22px;
+.ds-prog-bar-bg {{
+    height: 3px; background: {C["paperEdge"]}; border-radius: 2px; overflow: hidden;
+    margin-bottom: 6px;
 }}
-
-/* ── Player card ──────────────────────────────────────────────────────────────── */
-.cs-player-card {{
-    background:{C["card"]}; border:1px solid {C["border"]};
-    border-radius:14px; padding:18px 20px;
-    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-    margin-bottom:14px;
+.ds-prog-bar-fill {{
+    height: 100%; background: {C["red"]}; transition: width 0.6s ease;
+    border-radius: 2px;
 }}
-.cs-player-avatar {{
-    width:46px; height:46px; border-radius:50%;
-    background:{C["primary"]};
-    display:flex; align-items:center; justify-content:center;
-    font-size:20px; color:#fff; flex-shrink:0;
+.ds-prog-status {{
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    margin-bottom: 20px;
 }}
-.cs-player-info {{ flex:1; }}
-.cs-player-name {{
-    font-family:Georgia,'Times New Roman',serif;
-    font-size:17px; font-weight:bold; color:{C["txt"]};
+.ds-prog-msg {{ color: {C["inkMuted"]}; }}
+.ds-prog-pct {{ color: {C["red"]}; font-weight: 500; }}
+.ds-prog-log {{
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: {C["inkMuted"]}; line-height: 1.8;
+    max-height: 120px; overflow-y: auto;
+    border-top: 1px solid {C["paperEdge"]}; padding-top: 14px;
 }}
-.cs-player-meta {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:10px; color:{C["txtMuted"]}; margin-top:2px;
-}}
-.cs-player-actions {{ display:flex; align-items:center; gap:10px; flex-shrink:0; }}
-.cs-badge {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:10px; letter-spacing:0.1em;
-    padding:4px 12px; border-radius:20px; border:1px solid;
-}}
-.cs-badge-self {{ background:{C["greenBg"]}; border-color:{C["greenBdr"]}; color:{C["green"]}; }}
-.cs-badge-opp  {{ background:{C["redBg"]};   border-color:{C["redBdr"]};   color:{C["red"]};   }}
-
-/* ── st.tabs() styling ────────────────────────────────────────────────────────── */
-[data-testid="stTabs"] {{
-    gap: 0;
-}}
-button[data-baseweb="tab"] {{
-    font-family:'Courier New',Courier,monospace !important;
-    font-size:11px !important; letter-spacing:0.08em !important;
-    text-transform:uppercase !important;
-    color:{C["txtMuted"]} !important;
-    background:{C["card"]} !important;
-    border:none !important; border-radius:0 !important;
-    border-bottom:3px solid transparent !important;
-    height:44px !important; padding:0 18px !important;
-}}
-button[data-baseweb="tab"][aria-selected="true"] {{
-    color:{C["primary"]} !important;
-    border-bottom:3px solid {C["primary"]} !important;
-    font-weight:700 !important;
-    background:{C["surface"]} !important;
-}}
-[data-baseweb="tab-list"] {{
-    background:{C["card"]} !important;
-    border-radius:10px 10px 0 0 !important;
-    border:1px solid {C["border"]} !important;
-    border-bottom:none !important;
-    gap:0 !important;
-}}
-[data-baseweb="tab-panel"] {{
-    background:{C["surface"]} !important;
-    border:1px solid {C["border"]} !important;
-    border-top:none !important;
-    border-radius:0 0 14px 14px !important;
-    padding:24px 22px !important;
+.ds-prog-pieces {{
+    display: flex; justify-content: center; gap: 14px;
+    margin-top: 24px; font-size: 24px; opacity: 0.35;
 }}
 
-/* ── Generic card ─────────────────────────────────────────────────────────────── */
-.cs-card {{
-    background:{C["card"]}; border:1px solid {C["border"]};
-    border-radius:12px; padding:22px; margin-bottom:14px;
+/* ── Player card (results header) ─────────────────────────────────────────── */
+.ds-player-card {{
+    background: {C["paper"]};
+    border: 1px solid {C["paperEdge"]};
+    border-radius: 4px; padding: 18px 20px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-bottom: 12px; position: relative;
 }}
-.cs-section-lbl {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:10px; letter-spacing:0.22em; text-transform:uppercase;
-    color:{C["txtMuted"]}; margin-bottom:16px;
+.ds-player-avatar {{
+    width: 44px; height: 44px; border-radius: 50%;
+    background: {C["ink"]};
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: {C["paper"]}; flex-shrink: 0;
+}}
+.ds-player-info {{ flex: 1; min-width: 0; }}
+.ds-player-name {{
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(16px,4vw,20px); font-weight: 700; color: {C["ink"]};
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}}
+.ds-player-meta {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: {C["inkMuted"]}; margin-top: 3px; letter-spacing: 0.06em;
+}}
+.ds-player-actions {{ display: flex; align-items: center; gap: 10px; flex-shrink: 0; }}
+.ds-badge {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 2px; border: 1px solid;
+}}
+.ds-badge-self {{ background:{C["paper"]};  border-color:{C["ink"]};   color:{C["ink"]};  }}
+.ds-badge-opp  {{ background:{C["redBg"]};  border-color:{C["red"]};   color:{C["red"]};  }}
+
+/* ── Section label ─────────────────────────────────────────────────────────── */
+.ds-section-lbl {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: {C["inkFaint"]}; margin-bottom: 14px; margin-top: 4px;
+    border-bottom: 1px solid {C["paperEdge"]}; padding-bottom: 8px;
 }}
 
-/* ── Metric grid ──────────────────────────────────────────────────────────────── */
-.cs-metrics-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }}
-.cs-metric-card {{
-    background:{C["card"]}; border:1px solid {C["border"]};
-    border-radius:10px; padding:16px 18px; border-top-width:3px;
+/* ── Metric grid ───────────────────────────────────────────────────────────── */
+.ds-metrics-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px; margin-bottom: 14px;
 }}
-.cs-metric-lbl {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:10px; color:{C["txtMuted"]}; letter-spacing:0.18em;
-    text-transform:uppercase; margin-bottom:8px;
+.ds-metric-card {{
+    background: {C["paper"]}; border: 1px solid {C["paperEdge"]};
+    border-radius: 4px; padding: 16px 18px; border-top: 3px solid {C["inkFaint"]};
 }}
-.cs-metric-val {{
-    font-family:Georgia,'Times New Roman',serif;
-    font-size:22px; font-weight:bold; color:{C["txt"]};
+.ds-metric-lbl {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: {C["inkFaint"]}; letter-spacing: 0.18em;
+    text-transform: uppercase; margin-bottom: 8px;
 }}
-.cs-metric-sub {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:11px; color:{C["txtMuted"]}; margin-top:4px;
+.ds-metric-val {{
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(20px,4vw,26px); font-weight: 700; color: {C["ink"]};
+}}
+.ds-metric-sub {{
+    font-family: 'Inter', system-ui;
+    font-size: 11px; color: {C["inkMuted"]}; margin-top: 4px;
 }}
 
-/* ── Color bar ────────────────────────────────────────────────────────────────── */
+/* ── Generic paper section ─────────────────────────────────────────────────── */
+.ds-card {{
+    background: {C["paper"]}; border: 1px solid {C["paperEdge"]};
+    border-radius: 4px; padding: 20px 22px; margin-bottom: 12px;
+}}
+
+/* ── Color bars ────────────────────────────────────────────────────────────── */
 .cs-bar-bg {{
-    background:{C["surface"]}; border:1px solid {C["border"]};
-    border-radius:6px; overflow:hidden; position:relative;
+    background: {C["paperEdge"]}; border-radius: 3px;
+    overflow: hidden; position: relative;
 }}
 .cs-bar-fill {{
-    height:100%; border-radius:6px;
-    display:flex; align-items:center; justify-content:flex-end;
-    padding-right:6px; box-sizing:border-box;
-    font-family:'Courier New',Courier,monospace;
-    font-size:10px; font-weight:bold; color:#fff;
+    height: 100%; border-radius: 3px;
+    display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 6px; box-sizing: border-box;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; color: #fff;
 }}
 
-/* ── Opening rows ────────────────────────────────────────────────────────────── */
-.cs-opening-row {{
-    padding:12px 0; border-bottom:1px solid {C["border"]};
-}}
+/* ── Opening rows ──────────────────────────────────────────────────────────── */
+.cs-opening-row {{ padding:10px 0; border-bottom:1px solid {C["paperEdge"]}; }}
 .cs-opening-row:last-child {{ border-bottom:none; }}
-.cs-opening-top {{
-    display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
-}}
+.cs-opening-top {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }}
 .cs-opening-name {{
-    font-family:Georgia,'Times New Roman',serif;
-    font-size:13px; color:{C["txt"]};
-    display:flex; align-items:center; gap:6px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 13px; color: {C["ink"]};
+    display: flex; align-items: center; gap: 6px;
 }}
 .cs-opening-right {{ display:flex; align-items:center; gap:6px; }}
 .cs-opening-games {{
-    font-family:'Courier New',Courier,monospace; font-size:11px; color:{C["txtMuted"]};
+    font-family:'JetBrains Mono',monospace; font-size:10px; color:{C["inkFaint"]};
 }}
 .cs-opening-pct {{
-    font-family:'Courier New',Courier,monospace; font-size:16px; font-weight:bold;
+    font-family:'Cormorant Garamond',Georgia,serif; font-size:16px; font-weight:600;
 }}
 .cs-tag {{
-    font-family:'Courier New',Courier,monospace; font-size:9px;
-    padding:2px 8px; border-radius:20px; border:1px solid;
+    font-family:'JetBrains Mono',monospace; font-size:9px;
+    padding:2px 8px; border-radius:2px; border:1px solid;
 }}
 .cs-tag-best {{ background:{C["greenBg"]}; border-color:{C["greenBdr"]}; color:{C["green"]}; }}
 .cs-tag-weak {{ background:{C["redBg"]};   border-color:{C["redBdr"]};   color:{C["red"]};   }}
 
-/* ── Quality bars (Erros tab) ────────────────────────────────────────────────── */
-.cs-qbar-row {{ margin-bottom:14px; }}
-.cs-qbar-head {{
-    display:flex; justify-content:space-between; align-items:baseline;
-    margin-bottom:5px;
-}}
-.cs-qbar-lbl {{
-    font-family:Georgia,'Times New Roman',serif; font-size:13px; color:{C["txtMid"]};
-}}
-.cs-qbar-val-wrap {{
-    font-family:'Courier New',Courier,monospace; font-size:13px; font-weight:bold;
-}}
-.cs-qbar-muted {{
-    font-family:'Courier New',Courier,monospace; font-size:11px; color:{C["txtMuted"]};
-}}
+/* ── Error quality bars ────────────────────────────────────────────────────── */
+.cs-qbar-row {{ margin-bottom:12px; }}
+.cs-qbar-head {{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }}
+.cs-qbar-lbl {{ font-family:'Cormorant Garamond',Georgia,serif; font-size:13px; color:{C["inkMid"]}; }}
+.cs-qbar-val-wrap {{ font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:500; }}
+.cs-qbar-muted {{ font-family:'JetBrains Mono',monospace; font-size:10px; color:{C["inkMuted"]}; }}
 
-/* ── Phase bar ────────────────────────────────────────────────────────────────── */
-.cs-phase-row {{ margin-bottom:18px; }}
-.cs-phase-head {{
-    display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:5px;
-}}
-.cs-phase-lbl {{
-    font-family:Georgia,'Times New Roman',serif; font-size:13px; color:{C["txt"]};
-}}
-.cs-phase-sub {{
-    font-family:'Courier New',Courier,monospace; font-size:10px; color:{C["txtMuted"]}; margin-top:2px;
-}}
-.cs-phase-val {{
-    font-family:Georgia,'Times New Roman',serif; font-size:22px; font-weight:bold;
-}}
+/* ── Phase bars ────────────────────────────────────────────────────────────── */
+.cs-phase-row {{ margin-bottom:16px; }}
+.cs-phase-head {{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:5px; }}
+.cs-phase-lbl {{ font-family:'Cormorant Garamond',Georgia,serif; font-size:14px; color:{C["ink"]}; }}
+.cs-phase-sub {{ font-family:'JetBrains Mono',monospace; font-size:10px; color:{C["inkMuted"]}; margin-top:2px; }}
+.cs-phase-val {{ font-family:'Cormorant Garamond',Georgia,serif; font-size:22px; font-weight:600; }}
 
-/* ── Insight box ─────────────────────────────────────────────────────────────── */
+/* ── Insight box ───────────────────────────────────────────────────────────── */
 .cs-insight {{
-    background:{C["redBg"]}; border:1px solid {C["redBdr"]};
-    border-radius:8px; padding:14px 16px; margin-top:18px;
+    background:{C["amberBg"]}; border:1px solid {C["amber"]}40;
+    border-radius:4px; padding:14px 16px; margin-top:16px;
+    border-left: 3px solid {C["amber"]};
 }}
 .cs-insight-lbl {{
-    font-family:'Courier New',Courier,monospace; font-size:10px;
-    color:{C["red"]}; letter-spacing:0.1em; margin-bottom:5px;
+    font-family:'JetBrains Mono',monospace; font-size:10px;
+    color:{C["amber"]}; letter-spacing:0.1em; margin-bottom:4px;
 }}
 .cs-insight-txt {{
-    font-family:Georgia,'Times New Roman',serif;
-    font-size:13px; color:{C["txtMid"]}; line-height:1.7;
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:14px; color:{C["inkMid"]}; line-height:1.7;
 }}
 
-/* ── Tactics grid ────────────────────────────────────────────────────────────── */
-.cs-tactics {{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }}
+/* ── Tactics grid ──────────────────────────────────────────────────────────── */
+.cs-tactics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }}
 .cs-tactic-card {{
-    background:{C["surface"]}; border:1px solid {C["border"]};
-    border-radius:10px; padding:14px 16px;
-    display:flex; align-items:center; gap:12px;
+    background:{C["paper"]}; border:1px solid {C["paperEdge"]};
+    border-radius:4px; padding:14px;
+    display:flex; align-items:center; gap:10px;
 }}
-.cs-tac-icon {{ font-size:26px; flex-shrink:0; }}
-.cs-tac-name {{
-    font-family:Georgia,'Times New Roman',serif;
-    font-size:12px; color:{C["txtMid"]}; margin-bottom:3px;
-}}
+.cs-tac-icon {{ font-size:24px; flex-shrink:0; }}
+.cs-tac-name {{ font-family:'Inter',system-ui; font-size:12px; color:{C["inkMid"]}; margin-bottom:3px; }}
 .cs-tac-bar-row {{ display:flex; align-items:center; gap:8px; }}
-.cs-tac-bar-bg {{
-    flex:1; height:6px; background:{C["card"]};
-    border:1px solid {C["border"]}; border-radius:3px; overflow:hidden;
-}}
+.cs-tac-bar-bg {{ flex:1; height:5px; background:{C["paperEdge"]}; border-radius:3px; overflow:hidden; }}
 .cs-tac-bar-fill {{ height:100%; border-radius:3px; }}
-.cs-tac-count {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:14px; font-weight:bold;
-}}
+.cs-tac-count {{ font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:500; }}
 
-/* ── Radar legend ─────────────────────────────────────────────────────────────── */
-.cs-radar-legend {{
-    display:flex; flex-wrap:wrap; gap:14px;
-    justify-content:center; margin-top:14px;
-}}
-.cs-radar-legend-item {{
-    display:flex; align-items:center; gap:6px;
-    font-family:'Courier New',Courier,monospace;
-    font-size:11px; color:{C["txtMid"]};
-}}
-.cs-radar-dot {{
-    width:10px; height:10px; border-radius:2px;
-    background:{C["primary"]}; opacity:0.5;
-}}
+/* ── Radar legend ──────────────────────────────────────────────────────────── */
+.cs-radar-legend {{ display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-top:12px; }}
+.cs-radar-legend-item {{ display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-size:10px; color:{C["inkMuted"]}; }}
+.cs-radar-dot {{ width:8px; height:8px; border-radius:2px; background:{C["inkMid"]}; opacity:0.4; }}
 
-/* ── Report ────────────────────────────────────────────────────────────────────── */
-.cs-report-outer {{ border:1px solid {C["border"]}; border-radius:12px; overflow:hidden; }}
-.cs-rpt-hdr {{
-    padding:14px 20px; border-bottom:1px solid {C["border"]};
-    display:flex; justify-content:space-between; align-items:center; gap:12px;
-}}
-.cs-rpt-hdr-self {{ background:{C["greenBg"]}; }}
-.cs-rpt-hdr-opp  {{ background:{C["redBg"]};   }}
-.cs-rpt-title-self {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:11px; letter-spacing:0.14em; color:{C["green"]};
-}}
-.cs-rpt-title-opp {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:11px; letter-spacing:0.14em; color:{C["red"]};
-}}
-.cs-rpt-sub {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:10px; color:{C["txtMuted"]}; margin-top:2px;
-}}
-.cs-rpt-body {{
-    max-height:500px; overflow-y:auto;
-    padding:24px 26px;
-    background:{C["card"]};
-}}
-.cs-rpt-main-title {{
-    font-family:Georgia,'Times New Roman',serif;
-    font-size:15px; font-weight:bold; color:{C["txt"]}; margin-bottom:4px;
-}}
-.cs-rpt-meta {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:10px; color:{C["txtMuted"]}; margin-bottom:24px;
-}}
-.cs-rpt-sec-title {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:11px; letter-spacing:0.1em; margin-bottom:10px;
-}}
-.cs-rpt-item {{
-    padding-left:14px;
-    font-family:Georgia,'Times New Roman',serif;
-    font-size:13px; color:{C["txtMid"]}; line-height:1.7; margin-bottom:7px;
-}}
-.cs-plan-lbl {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:11px; letter-spacing:0.12em; color:{C["primary"]};
-    margin-bottom:14px; margin-top:20px;
-}}
-.cs-priority-lbl {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:11px; margin-bottom:7px; margin-top:16px;
-}}
-.cs-checklist {{
-    background:{C["surface"]}; border:1px solid {C["border"]};
-    border-radius:8px; padding:14px 18px; margin-top:20px;
-}}
-.cs-checklist-lbl {{
-    font-family:'Courier New',Courier,monospace;
-    font-size:10px; color:{C["txtMuted"]}; letter-spacing:0.18em; margin-bottom:12px;
-}}
-.cs-checklist-item {{
-    display:flex; align-items:flex-start; gap:10px; margin-bottom:9px;
-}}
-.cs-checkbox {{
-    width:14px; height:14px; border-radius:3px;
-    border:1px solid {C["borderMid"]}; flex-shrink:0; margin-top:2px;
-}}
-.cs-checklist-txt {{
-    font-family:Georgia,'Times New Roman',serif;
-    font-size:13px; color:{C["txtMid"]}; line-height:1.6;
-}}
-
-/* ── Win-rate by color ────────────────────────────────────────────────────────── */
+/* ── Win-rate by color ─────────────────────────────────────────────────────── */
 .cs-color-block {{ margin-bottom:16px; }}
-.cs-color-head {{
-    display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px;
+.cs-color-head {{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px; }}
+.cs-color-lbl {{ font-family:'Cormorant Garamond',Georgia,serif; font-size:14px; color:{C["ink"]}; }}
+.cs-color-sub {{ font-family:'JetBrains Mono',monospace; font-size:10px; color:{C["inkMuted"]}; }}
+.cs-color-pct {{ font-family:'Cormorant Garamond',Georgia,serif; font-size:28px; font-weight:700; }}
+
+/* ── Step IV — result detail screens ──────────────────────────────────────── */
+.ds-detail-header {{
+    background: {C["paper"]}; border: 1px solid {C["paperEdge"]};
+    border-radius: 4px 4px 0 0;
+    padding: 16px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    position: relative; overflow: hidden;
 }}
-.cs-color-lbl {{
-    font-family:Georgia,'Times New Roman',serif; font-size:14px; color:{C["txt"]};
+.ds-detail-hdr-self {{ border-top: 3px solid {C["ink"]}; }}
+.ds-detail-hdr-opp  {{ border-top: 3px solid {C["red"]}; }}
+.ds-detail-title {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
 }}
-.cs-color-sub {{
-    font-family:'Courier New',Courier,monospace; font-size:10px; color:{C["txtMuted"]};
+.ds-detail-title-self {{ color: {C["ink"]}; }}
+.ds-detail-title-opp  {{ color: {C["red"]}; }}
+.ds-detail-sub {{
+    font-family: 'Inter', system-ui;
+    font-size: 11px; color: {C["inkMuted"]}; margin-top: 2px;
 }}
-.cs-color-pct {{
-    font-family:Georgia,'Times New Roman',serif; font-size:28px; font-weight:bold;
+.ds-detail-body {{
+    background: {C["paper"]}; border: 1px solid {C["paperEdge"]};
+    border-top: none; border-radius: 0 0 4px 4px;
+    padding: clamp(18px,4vw,28px) clamp(16px,4vw,28px);
+    margin-bottom: 14px;
 }}
 
-/* ── Reset wrap ───────────────────────────────────────────────────────────────── */
+/* Markdown inside report body */
+.ds-detail-body h1,.ds-detail-body h2,.ds-detail-body h3 {{
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    color: {C["ink"]} !important; font-weight: 700 !important;
+}}
+.ds-detail-body h1 {{ font-size: clamp(20px,4vw,26px) !important; border-bottom: 1px solid {C["paperEdge"]}; padding-bottom: 6px; margin-bottom: 12px; }}
+.ds-detail-body h2 {{ font-size: clamp(16px,3vw,20px) !important; margin-top: 22px; }}
+.ds-detail-body h3 {{ font-size: 14px !important; color: {C["inkMid"]} !important; margin-top: 14px; }}
+.ds-detail-body p {{ font-family:'Cormorant Garamond',Georgia,serif; font-size:15px; line-height:1.7; color:{C["inkMid"]}; }}
+.ds-detail-body li {{ font-family:'Cormorant Garamond',Georgia,serif; font-size:14px; line-height:1.6; color:{C["inkMid"]}; }}
+.ds-detail-body table {{ width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; overflow-x:auto; display:block; }}
+.ds-detail-body th {{ font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.1em; background:{C["bg"]}; padding:7px 10px; text-align:left; border:1px solid {C["paperEdge"]}; color:{C["inkMuted"]}; text-transform:uppercase; }}
+.ds-detail-body td {{ font-family:'Inter',system-ui; font-size:12px; padding:6px 10px; border:1px solid {C["paperEdge"]}; color:{C["inkMid"]}; }}
+
+/* Stamp CONFIDENCIAL */
+.ds-stamp {{
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%) rotate(-12deg);
+    border: 2.5px double {C["red"]};
+    color: {C["red"]}; border-radius: 2px;
+    padding: 3px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.18em; font-weight: 500;
+    opacity: 0.85; pointer-events: none; text-transform: uppercase;
+    white-space: nowrap;
+}}
+
+/* ── ACPL hero ─────────────────────────────────────────────────────────────── */
+.ds-acpl-hero {{
+    text-align: center; padding: 20px 0 14px;
+    border-bottom: 1px solid {C["paperEdge"]}; margin-bottom: 20px;
+}}
+.ds-acpl-val {{
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(44px,10vw,64px); font-weight: 700; line-height: 1;
+    color: {C["ink"]};
+}}
+.ds-acpl-lbl {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: {C["inkFaint"]}; letter-spacing: 0.2em;
+    text-transform: uppercase; margin-top: 4px;
+}}
+.ds-acpl-interp {{
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 15px; color: {C["inkMuted"]}; margin-top: 6px; font-style: italic;
+}}
+
+/* ── Overview CTA button (Ver relatório) ───────────────────────────────────── */
+.ds-cta-wrap {{ text-align: center; padding: 24px 0 8px; }}
+
+/* ── Reset wrap ────────────────────────────────────────────────────────────── */
 .cs-reset-wrap {{ display:flex; justify-content:center; margin-top:24px; }}
 
-/* ── Mobile ────────────────────────────────────────────────────────────────────── */
-@media (max-width:640px) {{
-    .cs-main {{ padding:32px 14px; }}
-    .cs-wizard-card {{ padding:28px 20px; }}
-    .cs-subtitle {{ display:none; }}
-    .cs-step-name {{ display:none; }}
-    .cs-connector {{ width:24px !important; }}
-    .cs-tab-content {{ padding:18px 16px; }}
-    .cs-tactics {{ grid-template-columns:1fr 1fr; }}
-    .cs-rpt-body {{ padding:18px; }}
-    button[data-baseweb="tab"] {{ font-size:9px !important; }}
+/* ── Tabs (overview) ───────────────────────────────────────────────────────── */
+[data-testid="stTabs"] {{ gap:0; }}
+button[data-baseweb="tab"] {{
+    font-family:'JetBrains Mono',monospace !important;
+    font-size:10px !important; letter-spacing:0.1em !important;
+    text-transform:uppercase !important;
+    color:{C["inkMuted"]} !important;
+    background:transparent !important;
+    border:none !important; border-radius:0 !important;
+    border-bottom:2px solid transparent !important;
+    height:42px !important; padding:0 16px !important;
+}}
+button[data-baseweb="tab"][aria-selected="true"] {{
+    color:{C["ink"]} !important;
+    border-bottom:2px solid {C["ink"]} !important;
+    font-weight:500 !important;
+}}
+[data-baseweb="tab-list"] {{
+    background:transparent !important;
+    border-bottom:1px solid {C["paperEdge"]} !important;
+    gap:0 !important;
+}}
+[data-baseweb="tab-panel"] {{
+    background:transparent !important;
+    border:none !important;
+    padding:18px 0 !important;
+}}
+
+/* ── Print ─────────────────────────────────────────────────────────────────── */
+@media print {{
+    .ds-header, .ds-footer, [data-testid="stButton"] {{ display:none !important; }}
+    body, .stApp {{ background: white !important; }}
+    .ds-detail-body {{ max-height:none !important; }}
+}}
+
+/* ── Mobile adjustments (min-width only) ───────────────────────────────────── */
+@media (max-width:479px) {{
+    .ds-stamp {{ display:none; }}
+    .ds-step-name {{ display:none; }}
+    .ds-connector {{ width:20px !important; }}
+    button[data-baseweb="tab"] {{ font-size:9px !important; padding:0 10px !important; }}
+    .cs-tactics {{ grid-template-columns:1fr 1fr !important; }}
+    .ds-wiz-sub {{ font-size:12px; }}
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -695,9 +639,9 @@ def _donut_svg(wins: int, draws: int, losses: int) -> str:
         )
 
     segs = (
-        seg(w_f, C["green"], 0) +
-        seg(d_f, C["slate"], w_f) +
-        seg(l_f, C["red"],   w_f + d_f)
+        seg(w_f, C["green"],    0) +
+        seg(d_f, C["inkMuted"], w_f) +
+        seg(l_f, C["red"],      w_f + d_f)
     )
     return f"""
 <svg width="180" height="180" viewBox="0 0 180 180"
@@ -708,21 +652,21 @@ def _donut_svg(wins: int, draws: int, losses: int) -> str:
     {segs}
   </g>
   <text x="90" y="82" text-anchor="middle"
-        font-family="Georgia,'Times New Roman',serif"
-        font-size="26" font-weight="bold" fill="{C["txt"]}">{win_pct}</text>
+        font-family="'Cormorant Garamond',Georgia,serif"
+        font-size="26" font-weight="bold" fill="{C["ink"]}">{win_pct}</text>
   <text x="90" y="97" text-anchor="middle"
-        font-family="'Courier New',Courier,monospace"
-        font-size="10" fill="{C["txtMuted"]}" letter-spacing="1">TX. VITÓRIA</text>
+        font-family="'JetBrains Mono',monospace"
+        font-size="10" fill="{C["inkMuted"]}" letter-spacing="1">TX. VITÓRIA</text>
   <text x="90" y="111" text-anchor="middle"
-        font-family="'Courier New',Courier,monospace"
-        font-size="10" fill="{C["txtMuted"]}">{total} partidas</text>
+        font-family="'JetBrains Mono',monospace"
+        font-size="10" fill="{C["inkFaint"]}">{total} partidas</text>
 </svg>"""
 
 
 def _radar_svg(scores: list[float]) -> str:
     cx, cy, R = 110, 110, 80
     labels = ["ABERTURA", "TÁTICAS", "MEIO-JOGO", "FINAL", "DEFESA", "TEMPO"]
-    colors = [C["green"] if s > 64 else (C["gold"] if s > 46 else C["red"])
+    colors = [C["green"] if s > 64 else (C["amber"] if s > 46 else C["red"])
               for s in scores]
     angles = [-90 + i * 60 for i in range(6)]
 
@@ -746,8 +690,8 @@ def _radar_svg(scores: list[float]) -> str:
     # data polygon
     data_pts = " ".join(f"{pt(s/100, a)[0]:.1f},{pt(s/100, a)[1]:.1f}"
                         for s, a in zip(scores, angles))
-    poly = (f'<polygon points="{data_pts}" fill="{C["primary"]}" fill-opacity="0.25" '
-            f'stroke="{C["primary"]}" stroke-width="2"/>')
+    poly = (f'<polygon points="{data_pts}" fill="{C["inkMid"]}" fill-opacity="0.18" '
+            f'stroke="{C["inkMid"]}" stroke-width="2"/>')
 
     # vertex dots & labels
     dots_html = ""
@@ -755,17 +699,17 @@ def _radar_svg(scores: list[float]) -> str:
     for i, (s, a, lbl, clr) in enumerate(zip(scores, angles, labels, colors)):
         x, y = pt(s/100, a)
         dots_html += (f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" '
-                      f'fill="{C["primary"]}" stroke="{C["card"]}" stroke-width="2"/>')
+                      f'fill="{C["inkMid"]}" stroke="{C["paper"]}" stroke-width="2"/>')
         lx, ly = pt(1.32, a)
         anchor = "middle"
         if   lx < cx - 5: anchor = "end"
         elif lx > cx + 5: anchor = "start"
         lbl_html += (
             f'<text x="{lx:.1f}" y="{ly - 7:.1f}" text-anchor="{anchor}" '
-            f'font-family="\'Courier New\',Courier,monospace" '
-            f'font-size="9" fill="{C["txtMuted"]}" letter-spacing="0.5">{lbl}</text>'
+            f'font-family="\'JetBrains Mono\',monospace" '
+            f'font-size="9" fill="{C["inkMuted"]}" letter-spacing="0.5">{lbl}</text>'
             f'<text x="{lx:.1f}" y="{ly + 6:.1f}" text-anchor="{anchor}" '
-            f'font-family="\'Courier New\',Courier,monospace" '
+            f'font-family="\'Cormorant Garamond\',Georgia,serif" '
             f'font-size="12" font-weight="bold" fill="{clr}">{int(s)}</text>'
         )
 
@@ -787,7 +731,7 @@ def _color_bar(pct: float, color: str, height: int = 16, show_label: bool = True
 
 
 def _section_lbl(text: str) -> str:
-    return f'<div class="cs-section-lbl">{text}</div>'
+    return f'<div class="ds-section-lbl">{text}</div>'
 
 
 # ── JS: wire tile clicks to backing buttons ───────────────────────────────────
@@ -834,18 +778,16 @@ def _inject_tile_js():
 # ── Header ────────────────────────────────────────────────────────────────────
 
 def render_header():
-    theme     = st.session_state.theme
-    icon      = "☀" if theme == "dark" else "☽"
-    label     = "Claro" if theme == "dark" else "Escuro"
-    new_theme = "light" if theme == "dark" else "dark"
+    lang       = st.session_state.get("lang", "pt")
+    other_lang = "en" if lang == "pt" else "pt"
+    btn_label  = "EN" if lang == "pt" else "PT"
     st.markdown(f"""
-    <div class="cs-header">
-      <div class="cs-header-left">
-        <span class="cs-logo">♞</span>
-        <span class="cs-title">CHESS SCOUT</span>
-        <span class="cs-subtitle">INTELIGÊNCIA DE JOGO</span>
+    <div class="ds-header">
+      <div class="ds-header-left">
+        <span class="ds-logo">♞</span>
+        <span class="ds-title">CHESS SCOUT</span>
       </div>
-      <a href="?theme={new_theme}" class="cs-theme-btn" target="_self">{icon} {label}</a>
+      <a href="?lang={other_lang}" class="ds-lang-btn" target="_self">{btn_label}</a>
     </div>
     """, unsafe_allow_html=True)
 
@@ -854,7 +796,7 @@ def render_header():
 
 def render_footer():
     st.markdown(
-        '<div class="cs-footer">CHESS SCOUT · STOCKFISH + PYTHON-CHESS</div>',
+        '<div class="ds-footer">CHESS SCOUT · STOCKFISH + PYTHON-CHESS</div>',
         unsafe_allow_html=True,
     )
 
@@ -864,40 +806,40 @@ def render_footer():
 _STEP_NAMES = ["Plataforma", "Usuário", "Perspectiva", "Tipo"]
 
 def render_stepper(current: int):
-    step = current
+    step  = current
     label = f"PASSO {step + 1} DE 4"
-    st.markdown(f'<div class="cs-step-label">{label}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="ds-step-label">{label}</div>', unsafe_allow_html=True)
 
     nodes_html = ""
     for i, name in enumerate(_STEP_NAMES):
         if i < step:
-            circ_cls = "cs-circle-done"
+            circ_cls = "ds-circle-done"
             sym      = "✓"
-            name_cls = "cs-name-inactive"
+            name_cls = ""
         elif i == step:
-            circ_cls = "cs-circle-active"
+            circ_cls = "ds-circle-active"
             sym      = str(i + 1)
-            name_cls = "cs-name-active"
+            name_cls = "ds-name-active"
         else:
-            circ_cls = "cs-circle-future"
+            circ_cls = "ds-circle-future"
             sym      = str(i + 1)
-            name_cls = "cs-name-inactive"
+            name_cls = ""
 
         conn = ""
         if i < 3:
-            conn_cls = "cs-conn-done" if i < step else "cs-conn-pending"
-            conn = f'<div class="cs-connector {conn_cls}"></div>'
+            conn_cls = "ds-conn-done" if i < step else "ds-conn-pending"
+            conn = f'<div class="ds-connector {conn_cls}"></div>'
 
         nodes_html += (
-            f'<div class="cs-step-node">'
-            f'<div class="cs-step-circle {circ_cls}">{sym}</div>'
-            f'<div class="cs-step-name {name_cls}">{name}</div>'
+            f'<div class="ds-step-node">'
+            f'<div class="ds-step-circle {circ_cls}">{sym}</div>'
+            f'<div class="ds-step-name {name_cls}">{name}</div>'
             f'</div>'
             f'{conn}'
         )
 
     st.markdown(
-        f'<div class="cs-stepper">{nodes_html}</div>',
+        f'<div class="ds-stepper">{nodes_html}</div>',
         unsafe_allow_html=True,
     )
 
@@ -943,10 +885,10 @@ def _nav(back_key: str, next_key: str, next_label: str = "Próximo →",
 def render_step_platform():
     plat = st.session_state.platform
     st.markdown(
-        '<div class="cs-wizard-card">'
-        '<div class="cs-wiz-icon">♜</div>'
-        '<div class="cs-wiz-title">Escolha a Plataforma</div>'
-        '<div class="cs-wiz-sub">Em qual plataforma este jogador tem conta?</div>',
+        '<div class="ds-paper">'
+        '<div class="ds-wiz-icon">♜</div>'
+        '<div class="ds-wiz-title">Escolha a Plataforma</div>'
+        '<div class="ds-wiz-sub">Em qual plataforma este jogador tem conta?</div>',
         unsafe_allow_html=True,
     )
 
@@ -970,17 +912,17 @@ def render_step_platform():
     if nxt:
         st.session_state.step = 1
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)  # close wizard-card
+    st.markdown('</div>', unsafe_allow_html=True)  # close ds-paper
 
 
 def render_step_username():
     plat_name = "Chess.com" if st.session_state.platform == "chesscom" else "Lichess"
     placeholder = "ex: magnuscarlsen" if st.session_state.platform == "chesscom" else "ex: DrNykterstein"
     st.markdown(
-        '<div class="cs-wizard-card">'
-        '<div class="cs-wiz-icon">♙</div>'
-        '<div class="cs-wiz-title">Nome de Usuário</div>'
-        f'<div class="cs-wiz-sub">Digite o usuário no {plat_name}</div>',
+        '<div class="ds-paper">'
+        '<div class="ds-wiz-icon">♙</div>'
+        '<div class="ds-wiz-title">Nome de Usuário</div>'
+        f'<div class="ds-wiz-sub">Digite o usuário no {plat_name}</div>',
         unsafe_allow_html=True,
     )
     uname = st.text_input(
@@ -1000,16 +942,16 @@ def render_step_username():
         st.session_state.username = uname.strip().lower()
         st.session_state.step = 2
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)  # close ds-paper
 
 
 def render_step_perspective():
     persp = st.session_state.perspective
     st.markdown(
-        '<div class="cs-wizard-card">'
-        '<div class="cs-wiz-icon">♔</div>'
-        '<div class="cs-wiz-title">Quem é este jogador?</div>'
-        '<div class="cs-wiz-sub">Sua resposta define o relatório gerado</div>',
+        '<div class="ds-paper">'
+        '<div class="ds-wiz-icon">♔</div>'
+        '<div class="ds-wiz-title">Quem é este jogador?</div>'
+        '<div class="ds-wiz-sub">Sua resposta define o relatório gerado</div>',
         unsafe_allow_html=True,
     )
 
@@ -1036,7 +978,7 @@ def render_step_perspective():
     if nxt:
         st.session_state.step = 3
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)  # close ds-paper
 
 
 _GAME_TYPES = [
@@ -1049,10 +991,10 @@ _GAME_TYPES = [
 def render_step_gametype():
     tc = st.session_state.time_classes
     st.markdown(
-        '<div class="cs-wizard-card">'
-        '<div class="cs-wiz-icon">⏱</div>'
-        '<div class="cs-wiz-title">Tipo de Partida</div>'
-        '<div class="cs-wiz-sub">Selecione um ou mais</div>',
+        '<div class="ds-paper">'
+        '<div class="ds-wiz-icon">⏱</div>'
+        '<div class="ds-wiz-title">Tipo de Partida</div>'
+        '<div class="ds-wiz-sub">Selecione um ou mais</div>',
         unsafe_allow_html=True,
     )
 
@@ -1084,72 +1026,53 @@ def render_step_gametype():
     if nxt and tc:
         st.session_state.analyzing = True
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)  # close ds-paper
 
 
 # ── Analysis runner ────────────────────────────────────────────────────────────
+
+_log_lines: list[str] = []
 
 def _prog_html(msg: str, pct: int) -> str:
     pieces    = ["♔", "♕", "♖", "♗", "♘", "♙"]
     thresholds = [10, 25, 45, 65, 80, 95]
     piece_html = "".join(
-        f'<span style="color:{C["primary"] if pct >= t else C["border"]};'
+        f'<span style="color:{C["red"] if pct >= t else C["border"]};'
         f'transition:color 0.4s">{p}</span>'
         for p, t in zip(pieces, thresholds)
     )
+    log_html = "".join(f"<div>→ {l}</div>" for l in _log_lines[-8:])
     return f"""
-<div style="padding:16px 0 0">
-  <div class="cs-prog-status">
-    <span class="cs-prog-msg">{msg}</span>
-    <span class="cs-prog-pct">{pct}%</span>
-  </div>
-  <div class="cs-prog-bar">
-    <div class="cs-prog-fill" style="width:{pct}%"></div>
-  </div>
-  <div class="cs-prog-pieces">{piece_html}</div>
-</div>"""
-
-
-def _locked_tiles_html(tc: list[str]) -> str:
-    """Read-only 2x2 grid showing the user's gametype selection during analysis."""
-    rows = [(_GAME_TYPES[0], _GAME_TYPES[1]), (_GAME_TYPES[2], _GAME_TYPES[3])]
-    out = ""
-    for row_idx, (left, right) in enumerate(rows):
-        out += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
-        for cat, icon, lbl, _sub in (left, right):
-            sel = cat in tc
-            bg = C["primary"] if sel else C["card"]
-            color = "#fff" if sel else C["txt"]
-            bdr = C["primary"] if sel else C["border"]
-            shadow = (f"box-shadow:0 4px 16px {C['primary']}40;" if sel else "")
-            out += (
-                f'<div style="height:110px;border-radius:12px;border:2px solid {bdr};'
-                f'background:{bg};color:{color};display:flex;align-items:center;'
-                f'justify-content:center;font-family:\'Courier New\',Courier,monospace;'
-                f'font-size:15px;font-weight:700;letter-spacing:0.05em;{shadow}">'
-                f'{icon}  {lbl}'
-                '</div>'
-            )
-        out += '</div>'
-    return out
+<div class="ds-prog-bar-bg"><div class="ds-prog-bar-fill" style="width:{pct}%"></div></div>
+<div class="ds-prog-status">
+  <span class="ds-prog-msg">{msg}</span>
+  <span class="ds-prog-pct">{pct}%</span>
+</div>
+<div class="ds-prog-log">{log_html}</div>
+<div class="ds-prog-pieces">{piece_html}</div>
+"""
 
 
 def run_analysis():
-    username   = st.session_state.username
-    platform   = st.session_state.platform
-    tc_filter  = st.session_state.time_classes or None
+    global _log_lines
+    _log_lines = []
+
+    username  = st.session_state.username
+    platform  = st.session_state.platform
+    tc_filter = st.session_state.time_classes or None
+    tc_label  = ", ".join(t.capitalize() for t in (tc_filter or []))
+    plat_name = "Lichess" if platform == "lichess" else "Chess.com"
 
     st.markdown(
-        '<div class="cs-wizard-card">'
-        '<div class="cs-wiz-icon">⏱</div>'
-        '<div class="cs-wiz-title">Tipo de Partida</div>'
-        '<div class="cs-wiz-sub">Selecione um ou mais</div>'
-        + _locked_tiles_html(st.session_state.time_classes or []),
+        f'<div class="ds-prog-wrap">'
+        f'<div class="ds-prog-title">Analisando {username}…</div>'
+        f'<div class="ds-prog-sub">{tc_label} · {plat_name}</div>',
         unsafe_allow_html=True,
     )
     prog = st.empty()
 
     def upd(msg, pct):
+        _log_lines.append(msg)
         prog.markdown(_prog_html(msg, pct), unsafe_allow_html=True)
 
     try:
@@ -1189,6 +1112,7 @@ def run_analysis():
             "diagnostic_md": diag,
             "guide_md":      guide,
             "analyzing":     False,
+            "result_step":   "overview",
         })
 
     except ValueError as e:
@@ -1213,225 +1137,30 @@ def render_player_card():
     total    = stats.get("total_games", 0)
     persp    = st.session_state.perspective
 
-    badge_cls  = "cs-badge-self" if persp == "self" else "cs-badge-opp"
-    badge_txt  = "♔ MEU DIAGNÓSTICO" if persp == "self" else "♚ GUIA DO ADVERSÁRIO"
+    badge_cls  = "ds-badge-self" if persp == "self" else "ds-badge-opp"
+    badge_txt  = "♔ DIAGNÓSTICO" if persp == "self" else "♚ ADVERSÁRIO"
 
     display_name = profile.get("username", username) if profile else username
 
-    col_info, col_actions = st.columns([3, 1])
-    with col_info:
-        st.markdown(
-            f'<div class="cs-player-card">'
-            f'<div class="cs-player-avatar">♞</div>'
-            f'<div class="cs-player-info">'
-            f'<div class="cs-player-name">{display_name}</div>'
-            f'<div class="cs-player-meta">{platform} · {tc_label} · {total} partidas</div>'
-            f'</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    with col_actions:
-        st.markdown(
-            f'<div style="display:flex;align-items:center;gap:10px;padding-top:4px">'
-            f'<span class="cs-badge {badge_cls}">{badge_txt}</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-        md_data   = (st.session_state.diagnostic_md
-                     if persp == "self"
-                     else st.session_state.guide_md)
-        pdf_bytes = md_to_pdf(md_data)
-        if pdf_bytes:
-            fname    = (f"DIAGNOSTICO_{username}.pdf" if persp == "self" else f"GUIA_ADVERSARIO_{username}.pdf")
-            dl_data  = pdf_bytes
-            dl_mime  = "application/pdf"
-        else:
-            fname    = (f"DIAGNOSTICO_{username}.md" if persp == "self" else f"GUIA_ADVERSARIO_{username}.md")
-            dl_data  = md_data
-            dl_mime  = "text/markdown"
-        st.download_button("↓ Exportar", data=dl_data,
-                           file_name=fname, mime=dl_mime,
-                           key="export_btn")
-
-
-# ── Tab 0: Resumo ────────────────────────────────────────────────────────────
-
-def _build_summary(stats: dict, username: str) -> str:
-    platform  = "Lichess" if st.session_state.platform == "lichess" else "Chess.com"
-    persp     = st.session_state.perspective
-    tc_list   = st.session_state.time_classes or []
-    tc_label  = "/".join(t.capitalize() for t in tc_list) if tc_list else "todas as modalidades"
-
-    rating    = stats.get("current_rating", None)
-    total     = stats.get("total_games", 0)
-    wr        = stats.get("win_rate", 0)
-    wins      = stats.get("wins", 0)
-    draws     = stats.get("draws", 0)
-    losses    = stats.get("losses", 0)
-
-    err       = stats.get("error_stats", {})
-    avg       = err.get("averages_per_game", {})
-    bp        = err.get("blunders_by_phase", {})
-    op_bl     = bp.get("opening",    0)
-    mg_bl     = bp.get("middlegame", 0)
-    eg_bl     = bp.get("endgame",    0)
-    blund_pg  = avg.get("blunder",   0)
-
-    best_w    = stats.get("best_opening_white")  or {}
-    worst_w   = stats.get("worst_opening_white") or {}
-    best_b    = stats.get("best_opening_black")  or {}
-    worst_b   = stats.get("worst_opening_black") or {}
-
-    # ── Classify win rate ──
-    if wr >= 60:   wr_desc = "excelente taxa de vitória"
-    elif wr >= 50: wr_desc = "taxa de vitória sólida"
-    elif wr >= 42: wr_desc = "taxa de vitória equilibrada"
-    else:          wr_desc = "taxa de vitória abaixo da média"
-
-    # ── Identify critical phase ──
-    phase_vals = {"abertura": op_bl, "meio-jogo": mg_bl, "final": eg_bl}
-    worst_phase = max(phase_vals, key=phase_vals.get)
-    best_phase  = min(phase_vals, key=phase_vals.get)
-
-    # ── Rating context ──
-    rating_str = f"rating {rating}" if rating and rating != "N/A" else "rating não disponível"
-
-    # ── Opening highlights ──
-    op_w_txt = (f"{best_w['opening']} ({best_w['win_rate']:.0f}% de vitória)"
-                if best_w.get("opening") else "variada")
-    op_b_txt = (f"{best_b['opening']} ({best_b['win_rate']:.0f}%)"
-                if best_b.get("opening") else "variada")
-    weak_w_txt = (f"{worst_w['opening']} ({worst_w['win_rate']:.0f}%)"
-                  if worst_w.get("opening") else None)
-
-    # ── Style hint ──
-    if eg_bl > mg_bl * 1.5:
-        style_hint = "O padrão de erros sugere um jogador mais confortável em posições abertas do que em finais técnicos."
-    elif mg_bl > eg_bl * 1.5:
-        style_hint = "O padrão de erros sugere dificuldade nas tensões táticas do meio-jogo, com mais segurança nos finais."
-    else:
-        style_hint = "O desempenho é relativamente uniforme entre as fases, sem uma vulnerabilidade dominante isolada."
-
-    # ── Opponent hook ──
-    if eg_bl >= 1.5:
-        opp_hook = f"pode ser vencido forçando finais técnicos — {eg_bl:.1f} blunders/partida nessa fase revelam fragilidade clara"
-    elif mg_bl >= 1.2:
-        opp_hook = f"pode ser vencido com complicações táticas no meio-jogo, onde registra {mg_bl:.1f} blunders/partida"
-    elif weak_w_txt:
-        opp_hook = f"pode ser vulnerável ao enfrentar {worst_w.get('opening','—')} com brancas ({worst_w.get('win_rate',0):.0f}% de aproveitamento)"
-    else:
-        opp_hook = "apresenta maior consistência global, sendo mais difícil de explorar — foque em forçar posições desconhecidas"
-
-    # ── Assemble paragraph ──
-    c_txt   = C["txt"]
-    c_green = C["green"]
-    c_red   = C["red"]
-    name_cap = username.capitalize()
-    best_val  = f"{phase_vals[best_phase]:.1f}"
-    worst_val = f"{phase_vals[worst_phase]:.1f}"
-
-    lines = [
-        f"<strong style='color:{c_txt}'>{name_cap}</strong> "
-        f"joga {tc_label} no {platform} com {rating_str} e {wr_desc} "
-        f"({wr:.0f}% em {total} partidas — {wins}V/{draws}E/{losses}D).",
-
-        f"Com brancas, sua abertura mais forte é {op_w_txt}; "
-        f"com pretas prefere {op_b_txt}.",
-
-        f"A fase mais sólida é o <strong style='color:{c_green}'>{best_phase}</strong> "
-        f"({best_val} blunders/partida), "
-        f"enquanto o <strong style='color:{c_red}'>{worst_phase}</strong> "
-        f"concentra a maior vulnerabilidade ({worst_val} blunders/partida).",
-
-        style_hint,
-
-        f"Como adversário, <strong style='color:{c_txt}'>{name_cap}</strong> "
-        + opp_hook + ".",
-    ]
-    return " ".join(lines)
-
-
-def render_tab_summary():
-    stats    = st.session_state.stats
-    username = st.session_state.username
-    persp    = st.session_state.perspective
-    platform = "Lichess" if st.session_state.platform == "lichess" else "Chess.com"
-    total    = stats.get("total_games", 0)
-    rating   = stats.get("current_rating", "—")
-    wr       = stats.get("win_rate", 0)
-
-    is_self   = (persp == "self")
-    badge_cls = "cs-badge-self" if is_self else "cs-badge-opp"
-    badge_txt = "♔ MEU DIAGNÓSTICO" if is_self else "♚ GUIA DO ADVERSÁRIO"
-
-    # header strip
-    hdr_bg  = C["greenBg"] if is_self else C["redBg"]
-    hdr_bdr = C["greenBdr"] if is_self else C["redBdr"]
     st.markdown(
-        f'<div style="background:{hdr_bg};border:1px solid {hdr_bdr};'
-        f'border-radius:10px;padding:12px 18px;margin-bottom:14px;'
-        f'display:flex;align-items:center;justify-content:space-between">'
-        f'<div style="font-family:\'Courier New\',monospace;font-size:10px;'
-        f'letter-spacing:0.14em;color:{C["green"] if is_self else C["red"]}">'
-        f'{badge_txt}</div>'
-        f'<div style="font-family:\'Courier New\',monospace;font-size:10px;'
-        f'color:{C["txtMuted"]}">{platform} · {total} partidas</div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
-    # narrative paragraph
-    summary = _build_summary(stats, username)
-    st.markdown(
-        f'<div class="cs-card" style="line-height:1.85">'
-        f'<div class="cs-section-lbl">ANÁLISE GERAL</div>'
-        f'<div style="font-family:Georgia,\'Times New Roman\',serif;'
-        f'font-size:14px;color:{C["txtMid"]}">'
-        f'{summary}'
+        f'<div class="ds-player-card">'
+        f'<div class="ds-player-avatar">♞</div>'
+        f'<div class="ds-player-info">'
+        f'<div class="ds-player-name">{display_name}</div>'
+        f'<div class="ds-player-meta">{platform} · {tc_label} · {total} partidas</div>'
+        f'</div>'
+        f'<div class="ds-player-actions">'
+        f'<span class="ds-badge {badge_cls}">{badge_txt}</span>'
         f'</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
 
-    # quick stats strip below paragraph
-    err    = stats.get("error_stats", {})
-    bp     = err.get("blunders_by_phase", {})
-    avg    = err.get("averages_per_game", {})
-    best_w = stats.get("best_opening_white") or {}
-    best_b = stats.get("best_opening_black") or {}
 
-    highlights = [
-        (C["primary"], rating,           "Rating"),
-        (C["green"],   f"{wr:.0f}%",     "Vitórias"),
-        (C["red"],     f"{avg.get('blunder', 0):.1f}", "Blunders/jogo"),
-        (C["gold"],    best_w.get("opening", "—") or "—", "Melhor c/ brancas"),
-        (C["amber"],   best_b.get("opening", "—") or "—", "Melhor c/ pretas"),
-    ]
-    cols_html = ""
-    for color, val, lbl in highlights:
-        cols_html += (
-            f'<div style="text-align:center;flex:1;min-width:0">'
-            f'<div style="font-family:Georgia,serif;font-size:18px;font-weight:bold;'
-            f'color:{color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
-            f'{val}</div>'
-            f'<div style="font-family:\'Courier New\',monospace;font-size:9px;'
-            f'color:{C["txtMuted"]};letter-spacing:0.12em;text-transform:uppercase;'
-            f'margin-top:4px">{lbl}</div>'
-            f'</div>'
-        )
-    st.markdown(
-        f'<div style="display:flex;gap:8px;background:{C["card"]};'
-        f'border:1px solid {C["border"]};border-radius:10px;padding:16px 12px">'
-        f'{cols_html}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
-
-# ── Tab 1: Visão Geral ────────────────────────────────────────────────────────
+# ── Tab: Visão Geral ──────────────────────────────────────────────────────────
 
 def _score_color(v: float) -> str:
-    return C["green"] if v > 64 else (C["gold"] if v > 46 else C["red"])
+    return C["green"] if v > 64 else (C["amber"] if v > 46 else C["red"])
 
 
 def _radar_scores(stats: dict) -> list[float]:
@@ -1464,48 +1193,10 @@ def render_tab_overview():
     draws   = stats.get("draws",   0)
     losses  = stats.get("losses",  0)
     total   = stats.get("total_games", wins + draws + losses) or 1
-    rating  = stats.get("current_rating", "—")
     wr      = stats.get("win_rate", 0)
-    err     = stats.get("error_stats", {})
-    bp      = err.get("blunders_by_phase", {})
-    avg_bl  = err.get("averages_per_game", {}).get("blunder", 0)
-    tc      = stats.get("time_class_stats", {})
-    best_tc = max(tc.items(), key=lambda x: x[1].get("wins", 0))[0] if tc else "—"
-
-    # ── Metric cards ──
-    st.markdown(
-        f'<div class="cs-metrics-grid">'
-
-        f'<div class="cs-metric-card" style="border-top-color:{C["primary"]}">'
-        f'<div class="cs-metric-lbl">RATING</div>'
-        f'<div class="cs-metric-val">{rating}</div>'
-        f'<div class="cs-metric-sub">Média Blitz</div>'
-        f'</div>'
-
-        f'<div class="cs-metric-card" style="border-top-color:{C["green"]}">'
-        f'<div class="cs-metric-lbl">TX. VITÓRIA</div>'
-        f'<div class="cs-metric-val">{wr:.0f}%</div>'
-        f'<div class="cs-metric-sub">{total} partidas</div>'
-        f'</div>'
-
-        f'<div class="cs-metric-card" style="border-top-color:{C["red"]}">'
-        f'<div class="cs-metric-lbl">BLUNDERS</div>'
-        f'<div class="cs-metric-val">{avg_bl:.1f}</div>'
-        f'<div class="cs-metric-sub">Por partida</div>'
-        f'</div>'
-
-        f'<div class="cs-metric-card" style="border-top-color:{C["gold"]}">'
-        f'<div class="cs-metric-lbl">MELHOR FASE</div>'
-        f'<div class="cs-metric-val">{best_tc.capitalize() if best_tc != "—" else "—"}</div>'
-        f'<div class="cs-metric-sub">Mais vitórias</div>'
-        f'</div>'
-
-        '</div>',
-        unsafe_allow_html=True,
-    )
 
     # ── Donut chart ──
-    st.markdown('<div class="cs-card">', unsafe_allow_html=True)
+    st.markdown('<div class="ds-card">', unsafe_allow_html=True)
     st.markdown(_section_lbl("RESULTADO DAS PARTIDAS"), unsafe_allow_html=True)
     st.markdown(_donut_svg(wins, draws, losses), unsafe_allow_html=True)
 
@@ -1515,19 +1206,19 @@ def render_tab_overview():
     st.markdown(
         f'<div style="display:flex;justify-content:center;gap:28px;margin-top:16px">'
         f'<div style="text-align:center">'
-        f'<div style="font-family:Georgia,serif;font-size:22px;font-weight:bold;color:{C["green"]}">{wins}</div>'
-        f'<div style="font-family:\'Courier New\',monospace;font-size:10px;color:{C["txtMuted"]};letter-spacing:0.1em;text-transform:uppercase">Vitórias</div>'
-        f'<div style="font-family:\'Courier New\',monospace;font-size:12px;color:{C["green"]}">{ww:.0f}%</div>'
+        f'<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:22px;font-weight:bold;color:{C["green"]}">{wins}</div>'
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:{C["inkMuted"]};letter-spacing:0.1em;text-transform:uppercase">Vitórias</div>'
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:{C["green"]}">{ww:.0f}%</div>'
         f'</div>'
         f'<div style="text-align:center">'
-        f'<div style="font-family:Georgia,serif;font-size:22px;font-weight:bold;color:{C["slate"]}">{draws}</div>'
-        f'<div style="font-family:\'Courier New\',monospace;font-size:10px;color:{C["txtMuted"]};letter-spacing:0.1em;text-transform:uppercase">Empates</div>'
-        f'<div style="font-family:\'Courier New\',monospace;font-size:12px;color:{C["slate"]}">{dw:.0f}%</div>'
+        f'<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:22px;font-weight:bold;color:{C["inkMuted"]}">{draws}</div>'
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:{C["inkMuted"]};letter-spacing:0.1em;text-transform:uppercase">Empates</div>'
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:{C["inkMuted"]}">{dw:.0f}%</div>'
         f'</div>'
         f'<div style="text-align:center">'
-        f'<div style="font-family:Georgia,serif;font-size:22px;font-weight:bold;color:{C["red"]}">{losses}</div>'
-        f'<div style="font-family:\'Courier New\',monospace;font-size:10px;color:{C["txtMuted"]};letter-spacing:0.1em;text-transform:uppercase">Derrotas</div>'
-        f'<div style="font-family:\'Courier New\',monospace;font-size:12px;color:{C["red"]}">{lw:.0f}%</div>'
+        f'<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:22px;font-weight:bold;color:{C["red"]}">{losses}</div>'
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:{C["inkMuted"]};letter-spacing:0.1em;text-transform:uppercase">Derrotas</div>'
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:{C["red"]}">{lw:.0f}%</div>'
         f'</div>'
         f'</div>',
         unsafe_allow_html=True,
@@ -1537,7 +1228,7 @@ def render_tab_overview():
     # ── Radar chart ──
     scores = _radar_scores(stats)
     dim_labels = ["Abertura", "Táticas", "Meio-jogo", "Final", "Defesa", "Tempo"]
-    st.markdown('<div class="cs-card">', unsafe_allow_html=True)
+    st.markdown('<div class="ds-card">', unsafe_allow_html=True)
     st.markdown(_section_lbl("PERFIL DE HABILIDADES"), unsafe_allow_html=True)
     st.markdown(_radar_svg(scores), unsafe_allow_html=True)
     legend_html = "".join(
@@ -1555,13 +1246,13 @@ def render_tab_overview():
     ob = stats.get("openings_black", [])
     wr_w = (sum(o["win_rate"] for o in ow) / len(ow)) if ow else wr
     wr_b = (sum(o["win_rate"] for o in ob) / len(ob)) if ob else wr
-    c_w  = C["green"] if wr_w >= 55 else (C["gold"] if wr_w >= 45 else C["red"])
-    c_b  = C["green"] if wr_b >= 55 else (C["gold"] if wr_b >= 45 else C["red"])
+    c_w  = C["green"] if wr_w >= 55 else (C["amber"] if wr_w >= 45 else C["red"])
+    c_b  = C["green"] if wr_b >= 55 else (C["amber"] if wr_b >= 45 else C["red"])
 
     games_w = sum(o["games"] for o in ow)
     games_b = sum(o["games"] for o in ob)
 
-    st.markdown('<div class="cs-card">', unsafe_allow_html=True)
+    st.markdown('<div class="ds-card">', unsafe_allow_html=True)
     st.markdown(_section_lbl("TAXA DE VITÓRIA POR COR"), unsafe_allow_html=True)
     for lbl, pct, col, gc in [
         ("♟ Com Brancas", wr_w, c_w, games_w),
@@ -1581,7 +1272,7 @@ def render_tab_overview():
     st.markdown('</div>', unsafe_allow_html=True)  # end color card
 
 
-# ── Tab 1: Erros ──────────────────────────────────────────────────────────────
+# ── Tab: Erros ────────────────────────────────────────────────────────────────
 
 def render_tab_errors():
     stats = st.session_state.stats
@@ -1591,8 +1282,8 @@ def render_tab_errors():
 
     if not avg:
         st.markdown(
-            f'<div class="cs-card" style="text-align:center;color:{C["txtMuted"]};'
-            f'font-family:\'Courier New\',monospace;font-size:12px">'
+            f'<div class="ds-card" style="text-align:center;color:{C["inkMuted"]};'
+            f'font-family:\'JetBrains Mono\',monospace;font-size:12px">'
             f'Análise de erros não disponível — Stockfish não encontrado.</div>',
             unsafe_allow_html=True,
         )
@@ -1603,16 +1294,16 @@ def render_tab_errors():
     quality = [
         ("Excelente",  avg.get("excellent",  18),   C["green"]),
         ("Bom",        avg.get("good",        22),   "#5aaa70"),
-        ("Imprecisão", avg.get("inaccuracy",   8),   C["gold"]),
+        ("Imprecisão", avg.get("inaccuracy",   8),   C["amber"]),
         ("Erro",       avg.get("mistake",      4),   C["amber"]),
         ("Blunder",    avg.get("blunder",    2.3),   C["red"]),
     ]
-    st.markdown('<div class="cs-card">', unsafe_allow_html=True)
+    st.markdown('<div class="ds-card">', unsafe_allow_html=True)
     st.markdown(_section_lbl("QUALIDADE DOS LANCES — MÉDIA POR PARTIDA"), unsafe_allow_html=True)
     for lbl, val, color in quality:
         pct   = min(val / _MAX * 100, 100)
         inner = (
-            f'<span style="font-family:\'Courier New\',monospace;font-size:10px;'
+            f'<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;'
             f'font-weight:bold;color:#fff;padding-right:6px">{pct:.0f}%</span>'
             if pct > 18 else ""
         )
@@ -1635,10 +1326,10 @@ def render_tab_errors():
     _MAX_PH = 2.5
     phases = [
         ("Abertura",  "Lances 1–15",  bp.get("opening",    0.3), C["green"]),
-        ("Meio-jogo", "Lances 16–35", bp.get("middlegame", 1.1), C["gold"]),
+        ("Meio-jogo", "Lances 16–35", bp.get("middlegame", 1.1), C["amber"]),
         ("Final",     "Lances 36+",   bp.get("endgame",    2.1), C["red"]),
     ]
-    st.markdown('<div class="cs-card">', unsafe_allow_html=True)
+    st.markdown('<div class="ds-card">', unsafe_allow_html=True)
     st.markdown(_section_lbl("BLUNDERS POR FASE DA PARTIDA"), unsafe_allow_html=True)
     for lbl, sub, val, color in phases:
         pct = min(val / _MAX_PH * 100, 100)
@@ -1662,7 +1353,7 @@ def render_tab_errors():
         f'<div class="cs-insight">'
         f'<div class="cs-insight-lbl">⚠ CONCLUSÃO CHAVE</div>'
         f'<div class="cs-insight-txt">Blunders no final são '
-        f'<strong style="color:{C["txt"]}">{ratio} maiores</strong> '
+        f'<strong style="color:{C["ink"]}">{ratio} maiores</strong> '
         f'que na abertura. Técnica de final de jogo é a prioridade #1.</div>'
         f'</div>',
         unsafe_allow_html=True,
@@ -1674,12 +1365,12 @@ def render_tab_errors():
         ("♞", "Garfo de Cavalo",  18, C["red"]),
         ("♗", "Cravada de Bispo", 12, C["amber"]),
         ("♖", "Última Fileira",    9, C["amber"]),
-        ("♕", "Espeto",            7, C["gold"]),
-        ("♙", "Avanço de Peão",    5, C["slate"]),
-        ("♔", "Segurança do Rei",  4, C["slate"]),
+        ("♕", "Espeto",            7, C["amber"]),
+        ("♙", "Avanço de Peão",    5, C["inkMuted"]),
+        ("♔", "Segurança do Rei",  4, C["inkMuted"]),
     ]
     _MAX_TAC = 20
-    st.markdown('<div class="cs-card">', unsafe_allow_html=True)
+    st.markdown('<div class="ds-card">', unsafe_allow_html=True)
     st.markdown(_section_lbl("PADRÕES TÁTICOS MAIS IGNORADOS"), unsafe_allow_html=True)
     st.markdown('<div class="cs-tactics">', unsafe_allow_html=True)
     for icon, name, count, color in tactics:
@@ -1705,7 +1396,7 @@ def render_tab_errors():
 def _pct_color(pct: float) -> str:
     if pct > 55: return C["green"]
     if pct < 43: return C["red"]
-    return C["gold"]
+    return C["amber"]
 
 
 def _opening_section(title: str, openings: list, best_key: str, worst_key: str):
@@ -1713,7 +1404,7 @@ def _opening_section(title: str, openings: list, best_key: str, worst_key: str):
     best_op  = stats.get(best_key, {}) or {}
     worst_op = stats.get(worst_key, {}) or {}
 
-    st.markdown(f'<div class="cs-card">', unsafe_allow_html=True)
+    st.markdown(f'<div class="ds-card">', unsafe_allow_html=True)
     st.markdown(_section_lbl(title), unsafe_allow_html=True)
 
     for op in openings[:6]:
@@ -1752,8 +1443,8 @@ def render_tab_openings():
 
     if not ow and not ob:
         st.markdown(
-            f'<div class="cs-card" style="text-align:center;color:{C["txtMuted"]};'
-            f'font-family:\'Courier New\',monospace;font-size:12px">'
+            f'<div class="ds-card" style="text-align:center;color:{C["inkMuted"]};'
+            f'font-family:\'JetBrains Mono\',monospace;font-size:12px">'
             f'Dados de abertura não disponíveis.</div>',
             unsafe_allow_html=True,
         )
@@ -1767,218 +1458,316 @@ def render_tab_openings():
                          ob, "best_opening_black", "worst_opening_black")
 
 
-# ── Tab 3: Relatório ──────────────────────────────────────────────────────────
+# ── Screen III: Overview ─────────────────────────────────────────────────────
 
-def _rpt_items(items: list[str], color: str) -> str:
-    html = ""
-    for item in items:
-        html += (
-            f'<div class="cs-rpt-item" '
-            f'style="border-left:2px solid {color}40">{item}</div>'
-        )
-    return html
-
-
-def render_tab_report():
+def render_screen_overview():
     stats    = st.session_state.stats
+    profile  = st.session_state.profile
     username = st.session_state.username
-    persp    = st.session_state.perspective
     platform = "Lichess" if st.session_state.platform == "lichess" else "Chess.com"
-    total    = stats.get("total_games", 0)
-    diag_md  = st.session_state.diagnostic_md or ""
-    guide_md = st.session_state.guide_md or ""
+    tc_label = ", ".join(t.capitalize() for t in st.session_state.time_classes) or "Todos"
+    persp    = st.session_state.perspective
+    is_self  = (persp == "self")
 
-    is_self   = (persp == "self")
-    hdr_cls   = "cs-rpt-hdr-self" if is_self else "cs-rpt-hdr-opp"
-    ttl_cls   = "cs-rpt-title-self" if is_self else "cs-rpt-title-opp"
-    ttl_txt   = "♔ DIAGNÓSTICO PESSOAL" if is_self else "♚ GUIA DO ADVERSÁRIO"
-    sub_txt   = f"Análise de {username}" if is_self else f"Como vencer {username}"
-    md_data   = diag_md if is_self else guide_md
-    pdf_bytes = md_to_pdf(md_data)
-    if pdf_bytes:
-        fname    = (f"DIAGNOSTICO_{username}.pdf" if is_self else f"GUIA_ADVERSARIO_{username}.pdf")
-        dl_data  = pdf_bytes
-        dl_mime  = "application/pdf"
-        dl_label = "↓ .pdf"
-    else:
-        fname    = (f"DIAGNOSTICO_{username}.md" if is_self else f"GUIA_ADVERSARIO_{username}.md")
-        dl_data  = md_data
-        dl_mime  = "text/markdown"
-        dl_label = "↓ .md"
+    wins   = stats.get("wins",   0)
+    draws  = stats.get("draws",  0)
+    losses = stats.get("losses", 0)
+    total  = stats.get("total_games", wins + draws + losses) or 1
+    rating = stats.get("current_rating", "—")
+    wr     = stats.get("win_rate", 0)
+    err    = stats.get("error_stats", {})
+    avg    = err.get("averages_per_game", {})
+    acpl   = err.get("acpl", 0)
+    avg_bl = avg.get("blunder", 0)
 
+    display_name = profile.get("username", username) if profile else username
+
+    # Player card
+    badge_cls = "ds-badge-self" if is_self else "ds-badge-opp"
+    badge_txt = "♔ DIAGNÓSTICO" if is_self else "♚ ADVERSÁRIO"
     st.markdown(
-        f'<div class="cs-report-outer">'
-        f'<div class="cs-rpt-hdr {hdr_cls}">'
-        f'<div>'
-        f'<div class="{ttl_cls}">{ttl_txt}</div>'
-        f'<div class="cs-rpt-sub">{sub_txt}</div>'
+        f'<div class="ds-player-card">'
+        f'<div class="ds-player-avatar">♞</div>'
+        f'<div class="ds-player-info">'
+        f'<div class="ds-player-name">{display_name}</div>'
+        f'<div class="ds-player-meta">{platform} · {tc_label} · {total} partidas</div>'
+        f'</div>'
+        f'<div class="ds-player-actions">'
+        f'<span class="ds-badge {badge_cls}">{badge_txt}</span>'
+        f'</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
-    st.download_button(dl_label, data=dl_data,
-                       file_name=fname, mime=dl_mime,
-                       key="rpt_dl_btn")
-    st.markdown('</div>', unsafe_allow_html=True)  # close header
 
-    # report body
-    st.markdown('<div class="cs-rpt-body">', unsafe_allow_html=True)
+    # Metrics grid
+    st.markdown(
+        f'<div class="ds-metrics-grid">'
+        f'<div class="ds-metric-card" style="border-top-color:{C["inkFaint"]}">'
+        f'<div class="ds-metric-lbl">RATING</div>'
+        f'<div class="ds-metric-val">{rating}</div>'
+        f'<div class="ds-metric-sub">{tc_label}</div>'
+        f'</div>'
+        f'<div class="ds-metric-card" style="border-top-color:{C["green"]}">'
+        f'<div class="ds-metric-lbl">TX. VITÓRIA</div>'
+        f'<div class="ds-metric-val">{wr:.0f}%</div>'
+        f'<div class="ds-metric-sub">{total} partidas</div>'
+        f'</div>'
+        f'<div class="ds-metric-card" style="border-top-color:{C["red"]}">'
+        f'<div class="ds-metric-lbl">ACPL</div>'
+        f'<div class="ds-metric-val">{acpl:.0f}</div>'
+        f'<div class="ds-metric-sub">perda/lance</div>'
+        f'</div>'
+        f'<div class="ds-metric-card" style="border-top-color:{C["amber"]}">'
+        f'<div class="ds-metric-lbl">BLUNDERS</div>'
+        f'<div class="ds-metric-val">{avg_bl:.1f}</div>'
+        f'<div class="ds-metric-sub">por partida</div>'
+        f'</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
-    err    = stats.get("error_stats", {})
-    avg    = err.get("averages_per_game", {})
-    bp     = err.get("blunders_by_phase", {})
-    wr     = stats.get("win_rate", 50)
-    blund  = avg.get("blunder", 2.3)
-    eg_bl  = bp.get("endgame", 2.1)
-    mg_bl  = bp.get("middlegame", 1.1)
-    ow     = stats.get("openings_white", [])
-    ob     = stats.get("openings_black", [])
-    best_w = stats.get("best_opening_white", {}) or {}
-    worst_w= stats.get("worst_opening_white", {}) or {}
-    best_b = stats.get("best_opening_black", {}) or {}
-    worst_b= stats.get("worst_opening_black", {}) or {}
-
-    if is_self:
-        st.markdown(
-            f'<div class="cs-rpt-main-title">Diagnóstico do Jogador — {username}</div>'
-            f'<div class="cs-rpt-meta">{total} partidas · {platform}</div>',
-            unsafe_allow_html=True,
-        )
-
-        strong_items = [
-            f"Abertura com brancas: {best_w.get('opening','—')} ({best_w.get('win_rate',0):.0f}% de vitória)" if best_w else "Abertura sólida com brancas",
-            f"Taxa de vitória geral de {wr:.0f}% nas últimas {total} partidas",
-            f"Blunders de abertura baixos ({bp.get('opening',0):.1f}/partida) — fase de abertura consistente",
-        ]
-        weak_items = [
-            f"Blunders no final: {eg_bl:.1f}/partida — maior vulnerabilidade identificada",
-            f"Abertura fraca com brancas: {worst_w.get('opening','—')} ({worst_w.get('win_rate',0):.0f}%)" if worst_w else "Gestão de tempo no meio-jogo irregular",
-            f"Meio-jogo gera {mg_bl:.1f} blunders/partida — cálculo tático a melhorar",
-        ]
-
-        st.markdown(
-            f'<div style="margin-bottom:20px">'
-            f'<div class="cs-rpt-sec-title" style="color:{C["green"]}">✅ Pontos Fortes</div>'
-            + _rpt_items(strong_items, C["green"]) +
-            f'</div>'
-            f'<div style="margin-bottom:20px">'
-            f'<div class="cs-rpt-sec-title" style="color:{C["red"]}">⚠️ Pontos Fracos</div>'
-            + _rpt_items(weak_items, C["red"]) +
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(f'<div class="cs-plan-lbl">📚 PLANO DE ESTUDOS</div>', unsafe_allow_html=True)
-
-        priorities = [
-            ("🔴 Alta — 30 dias",    C["red"],   [
-                f"Técnica de finais: treinar Rei + Peão vs Rei, Torres básicas",
-                f"Puzzles de táticas diários focando em garfos e cravadas",
-                f"Revisar as 3 partidas com mais blunders no final",
-            ]),
-            ("🟡 Média — 90 dias",   C["amber"], [
-                f"Aprofundar linha principal da {best_w.get('opening','Abertura favorita')} com brancas",
-                f"Exercícios de cálculo de variantes a 3 lances",
-                f"Estudar conversão de vantagem material no final",
-            ]),
-            ("🟢 Baixa — Contínuo",  C["green"], [
-                f"Manter repertório de abertura com pretas ({best_b.get('opening','—')})",
-                f"Partidas lentas (30+ min) para construir hábito de planejamento",
-                f"Revisão semanal das partidas perdidas",
-            ]),
-        ]
-        for lbl, color, items in priorities:
-            st.markdown(
-                f'<div class="cs-priority-lbl" style="color:{color}">{lbl}</div>'
-                + _rpt_items(items, color),
-                unsafe_allow_html=True,
-            )
-
-    else:
-        st.markdown(
-            f'<div class="cs-rpt-main-title">Como Vencer {username}</div>'
-            f'<div class="cs-rpt-meta">Inteligência sobre adversário · {total} partidas</div>',
-            unsafe_allow_html=True,
-        )
-
-        sections = [
-            ("🎯 Preparação de Abertura",   C["red"],     [
-                f"Evitar {best_w.get('opening','linhas que ele domina')} com brancas — vitória de {best_w.get('win_rate',0):.0f}%",
-                f"Explorar {worst_w.get('opening','abertura fraca')} — só {worst_w.get('win_rate',0):.0f}% de vitória com brancas",
-                f"Com pretas: forçar {worst_b.get('opening','posições desconfortáveis')} ({worst_b.get('win_rate',0):.0f}% para ele)",
-            ]),
-            ("⚔️ Estratégia no Meio-jogo",  C["amber"],   [
-                f"Criar complicações táticas — comete {mg_bl:.1f} blunders/partida no meio-jogo",
-                "Posições dinâmicas e desequilibradas favorecem quem calcular mais",
-                "Evitar trocas que simplificam para finais — ele melhora com menos peças",
-            ]),
-            ("🏁 Plano para o Final",        C["primary"], [
-                f"Forçar finais sempre que possível — {eg_bl:.1f} blunders/partida no final",
-                "Finais de torres são ideais: complexos e exigem técnica precisa",
-                "Peões passados na ala da dama como plano de longo prazo",
-            ]),
-            ("⚠️ Fique Atento a",            C["slate"],   [
-                f"Abertura favorita com brancas: {best_w.get('opening','—')} — prepare defesa específica",
-                "Ele é mais sólido na abertura — não force lances duvidosos cedo",
-                "Manage o tempo: ele pode melhorar sob pressão de relógio",
-            ]),
-        ]
-        for title, color, items in sections:
-            st.markdown(
-                f'<div style="margin-bottom:20px">'
-                f'<div class="cs-rpt-sec-title" style="color:{color}">{title}</div>'
-                + _rpt_items(items, color) +
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-        checklist_items = [
-            f"Estudar repertório de abertura de {username} (últimas 20 partidas)",
-            f"Preparar linha específica contra {best_w.get('opening','abertura favorita')}",
-            "Revisar técnica de finais de torres antes da partida",
-            "Definir plano de jogo para posições fechadas vs abertas",
-            "Confirmar que você conhece as principais táticas (garfo, cravada)",
-        ]
-        checklist_html = "".join(
-            f'<div class="cs-checklist-item">'
-            f'<div class="cs-checkbox"></div>'
-            f'<div class="cs-checklist-txt">{item}</div>'
-            f'</div>'
-            for item in checklist_items
-        )
-        st.markdown(
-            f'<div class="cs-checklist">'
-            f'<div class="cs-checklist-lbl">✅ CHECKLIST PRÉ-PARTIDA</div>'
-            f'{checklist_html}'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.markdown('</div></div>', unsafe_allow_html=True)  # end body + report-outer
-
-
-# ── Main flow ─────────────────────────────────────────────────────────────────
-
-render_header()
-
-st.markdown('<div class="cs-page"><div class="cs-main">', unsafe_allow_html=True)
-
-if st.session_state.stats:
-    # ── Results view ──
-    st.markdown('<div class="cs-results-wrap">', unsafe_allow_html=True)
-
-    render_player_card()
-
-    # Native tab bar
-    _tab_labels = ["Visão Geral", "Erros", "Aberturas", "Relatório"]
-    _tabs = st.tabs(_tab_labels)
+    # Sub-tabs
+    _tabs = st.tabs(["Visão Geral", "Erros", "Aberturas"])
     with _tabs[0]:
         render_tab_overview()
     with _tabs[1]:
         render_tab_errors()
     with _tabs[2]:
         render_tab_openings()
-    with _tabs[3]:
-        render_tab_report()
+
+    # CTA
+    cta_label = "♔ Ver Diagnóstico Pessoal" if is_self else "♚ Ver Plano de Ataque"
+    st.markdown('<div class="ds-cta-wrap">', unsafe_allow_html=True)
+    if st.button(cta_label, key="cta_detail_btn", type="primary"):
+        st.session_state.result_step = "detail"
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ── Screen IV-A: Personal ─────────────────────────────────────────────────────
+
+def render_screen_personal():
+    stats    = st.session_state.stats
+    username = st.session_state.username
+    diag_md  = st.session_state.diagnostic_md or ""
+    err      = stats.get("error_stats", {})
+    acpl     = err.get("acpl", 0)
+    bp       = err.get("blunders_by_phase", {})
+
+    if acpl < 20:   acpl_interp = "Nível master — precisão excepcional"
+    elif acpl < 40: acpl_interp = "Jogador avançado — erros controlados"
+    elif acpl < 60: acpl_interp = "Nível intermediário — espaço para evolução"
+    else:           acpl_interp = "Fase difícil — foco em reduzir erros"
+
+    pdf_bytes = md_to_pdf(diag_md)
+    if pdf_bytes:
+        dl_data = pdf_bytes; dl_mime = "application/pdf"; fname = f"DIAGNOSTICO_{username}.pdf"
+        dl_label = "↓ .pdf"
+    else:
+        dl_data = (diag_md or "").encode(); dl_mime = "text/markdown"; fname = f"DIAGNOSTICO_{username}.md"
+        dl_label = "↓ .md"
+
+    # Header + download
+    col_hdr, col_dl = st.columns([5, 1])
+    with col_hdr:
+        st.markdown(
+            '<div class="ds-detail-header ds-detail-hdr-self">'
+            '<div>'
+            '<div class="ds-detail-title ds-detail-title-self">♔ RELATÓRIO PESSOAL</div>'
+            f'<div class="ds-detail-sub">Análise de {username}</div>'
+            '</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with col_dl:
+        st.download_button(dl_label, data=dl_data, file_name=fname, mime=dl_mime,
+                           key="personal_dl_btn")
+
+    # ACPL hero
+    st.markdown(
+        f'<div class="ds-acpl-hero">'
+        f'<div class="ds-acpl-val">{acpl:.0f}</div>'
+        f'<div class="ds-acpl-lbl">ACPL — PERDA MÉDIA POR LANCE</div>'
+        f'<div class="ds-acpl-interp">{acpl_interp}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Errors by phase
+    _MAX_PH = 2.5
+    phases = [
+        ("Abertura",  "Lances 1–15",  bp.get("opening",    0), C["green"]),
+        ("Meio-jogo", "Lances 16–35", bp.get("middlegame", 0), C["amber"]),
+        ("Final",     "Lances 36+",   bp.get("endgame",    0), C["red"]),
+    ]
+    st.markdown('<div class="ds-card">', unsafe_allow_html=True)
+    st.markdown('<div class="ds-section-lbl">BLUNDERS POR FASE</div>', unsafe_allow_html=True)
+    for lbl, sub, val, color in phases:
+        pct = min(val / _MAX_PH * 100, 100)
+        st.markdown(
+            f'<div class="cs-phase-row">'
+            f'<div class="cs-phase-head">'
+            f'<div><div class="cs-phase-lbl">{lbl}</div>'
+            f'<div class="cs-phase-sub">{sub}</div></div>'
+            f'<div class="cs-phase-val" style="color:{color}">{val:.1f}</div>'
+            f'</div>'
+            f'<div class="cs-bar-bg" style="height:16px">'
+            f'<div class="cs-bar-fill" style="width:{pct:.1f}%;background:{color};height:16px">'
+            f'</div></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Narrative report
+    st.markdown('<div class="ds-detail-body">', unsafe_allow_html=True)
+    if diag_md:
+        st.markdown(diag_md)
+    else:
+        st.markdown(
+            f'<p style="color:{C["inkMuted"]};font-style:italic">Relatório não gerado.</p>',
+            unsafe_allow_html=True,
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Back button
+    st.markdown('<div class="cs-reset-wrap">', unsafe_allow_html=True)
+    if st.button("← Voltar para Visão Geral", key="back_personal", type="secondary"):
+        st.session_state.result_step = "overview"
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ── Screen IV-B: Adversary ────────────────────────────────────────────────────
+
+def render_screen_adversary():
+    stats    = st.session_state.stats
+    username = st.session_state.username
+    guide_md = st.session_state.guide_md or ""
+    err      = stats.get("error_stats", {})
+    bp       = err.get("blunders_by_phase", {})
+    ow       = stats.get("openings_white", [])
+
+    pdf_bytes = md_to_pdf(guide_md)
+    if pdf_bytes:
+        dl_data = pdf_bytes; dl_mime = "application/pdf"; fname = f"GUIA_ADVERSARIO_{username}.pdf"
+        dl_label = "↓ .pdf"
+    else:
+        dl_data = (guide_md or "").encode(); dl_mime = "text/markdown"; fname = f"GUIA_ADVERSARIO_{username}.md"
+        dl_label = "↓ .md"
+
+    # Header + stamp + download
+    col_hdr, col_dl = st.columns([5, 1])
+    with col_hdr:
+        st.markdown(
+            '<div class="ds-detail-header ds-detail-hdr-opp">'
+            '<div>'
+            '<div class="ds-detail-title ds-detail-title-opp">♚ PLANO DE ATAQUE</div>'
+            f'<div class="ds-detail-sub">Como vencer {username}</div>'
+            '</div>'
+            '<div class="ds-stamp">CONFIDENCIAL</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with col_dl:
+        st.download_button(dl_label, data=dl_data, file_name=fname, mime=dl_mime,
+                           key="adversary_dl_btn")
+
+    # Key intel
+    worst_w  = stats.get("worst_opening_white", {}) or {}
+    phase_vals = {
+        "final":     bp.get("endgame",    0),
+        "meio-jogo": bp.get("middlegame", 0),
+        "abertura":  bp.get("opening",    0),
+    }
+    worst_phase     = max(phase_vals, key=phase_vals.get)
+    worst_phase_val = phase_vals[worst_phase]
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(
+            f'<div class="ds-card">'
+            f'<div class="ds-section-lbl">🎯 LINHA DECISIVA</div>'
+            f'<div style="font-family:\'Cormorant Garamond\',Georgia,serif;'
+            f'font-size:16px;color:{C["red"]};font-weight:700;margin-bottom:5px">'
+            f'{worst_w.get("opening", "Posições abertas")}</div>'
+            f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:{C["inkMuted"]}">'
+            f'Apenas {worst_w.get("win_rate", 0):.0f}% de vitória com brancas'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    with col2:
+        st.markdown(
+            f'<div class="ds-card">'
+            f'<div class="ds-section-lbl">⚡ FASE CRÍTICA</div>'
+            f'<div style="font-family:\'Cormorant Garamond\',Georgia,serif;'
+            f'font-size:16px;color:{C["red"]};font-weight:700;margin-bottom:5px">'
+            f'{worst_phase.capitalize()}</div>'
+            f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:{C["inkMuted"]}">'
+            f'{worst_phase_val:.1f} blunders/partida — janela de pressão'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    # Weapons to avoid
+    strong_white = [o for o in ow if o.get("win_rate", 0) >= 55][:3]
+    if strong_white:
+        st.markdown('<div class="ds-card">', unsafe_allow_html=True)
+        st.markdown('<div class="ds-section-lbl">🛡 ARMAS A EVITAR — ele domina</div>',
+                    unsafe_allow_html=True)
+        for op in strong_white:
+            wr_op = op.get("win_rate", 0)
+            st.markdown(
+                f'<div class="cs-opening-row">'
+                f'<div class="cs-opening-top">'
+                f'<div class="cs-opening-name">{op.get("opening", "—")}</div>'
+                f'<div class="cs-opening-right">'
+                f'<span class="cs-opening-games">{op.get("games", 0)}p</span>'
+                f'<span class="cs-opening-pct" style="color:{C["red"]}">{wr_op:.0f}%</span>'
+                f'</div></div>'
+                + _color_bar(wr_op, C["red"], height=8, show_label=False) +
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Narrative guide
+    st.markdown('<div class="ds-detail-body">', unsafe_allow_html=True)
+    if guide_md:
+        st.markdown(guide_md)
+    else:
+        st.markdown(
+            f'<p style="color:{C["inkMuted"]};font-style:italic">Guia não gerado.</p>',
+            unsafe_allow_html=True,
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Back button
+    st.markdown('<div class="cs-reset-wrap">', unsafe_allow_html=True)
+    if st.button("← Voltar para Visão Geral", key="back_adversary", type="secondary"):
+        st.session_state.result_step = "overview"
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ── Main flow ─────────────────────────────────────────────────────────────────
+
+render_header()
+
+if st.session_state.stats:
+    # ── Results view ──
+    st.markdown('<div class="ds-results-wrap">', unsafe_allow_html=True)
+
+    result_step = st.session_state.get("result_step", "overview")
+    if result_step == "detail":
+        if st.session_state.perspective == "self":
+            render_screen_personal()
+        else:
+            render_screen_adversary()
+    else:
+        render_screen_overview()
 
     # Reset button
     st.markdown('<div class="cs-reset-wrap">', unsafe_allow_html=True)
@@ -1992,14 +1781,14 @@ if st.session_state.stats:
 
 elif st.session_state.analyzing:
     # ── Analysis in progress ──
-    st.markdown('<div class="cs-wizard-wrap">', unsafe_allow_html=True)
+    st.markdown('<div class="ds-wizard-wrap">', unsafe_allow_html=True)
     render_stepper(3)
     run_analysis()
     st.markdown('</div>', unsafe_allow_html=True)
 
 else:
     # ── Wizard ──
-    st.markdown('<div class="cs-wizard-wrap">', unsafe_allow_html=True)
+    st.markdown('<div class="ds-wizard-wrap">', unsafe_allow_html=True)
     step = st.session_state.step
     render_stepper(step)
     if step == 0:
@@ -2011,7 +1800,5 @@ else:
     elif step == 3:
         render_step_gametype()
     st.markdown('</div>', unsafe_allow_html=True)
-
-st.markdown('</div></div>', unsafe_allow_html=True)  # close cs-main + cs-page
 
 render_footer()
