@@ -15,7 +15,7 @@ MOVE_CLASSIFICATIONS = {
     "blunder": (200, 10000),
 }
 
-DEPTH = 15
+DEPTH = 10  # suficiente para detectar ~90% dos blunders vs depth 15; ~4-5x mais rápido
 
 
 def _find_stockfish_path() -> str:

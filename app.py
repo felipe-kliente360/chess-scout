@@ -119,7 +119,7 @@ if analyze_btn and username_input:
 
         profile, games = fetch_games(
             username,
-            target=100,
+            target=50,
             time_class_filter=time_class_filter,
             platform=platform,
             progress_callback=fetch_progress,
