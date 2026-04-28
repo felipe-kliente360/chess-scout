@@ -1189,10 +1189,10 @@ def render_player_card():
 
 # ── Results: tab bar ──────────────────────────────────────────────────────────
 
-_TAB_LABELS = ["Visão Geral", "Erros", "Aberturas", "Relatório"]
+_TAB_LABELS = ["Resumo", "Visão Geral", "Erros", "Aberturas", "Relatório"]
 
 def render_tab_bar():
-    cols = st.columns(4)
+    cols = st.columns(5)
     for i, (col, lbl) in enumerate(zip(cols, _TAB_LABELS)):
         with col:
             active = (st.session_state.active_tab == i)
@@ -1204,7 +1204,181 @@ def render_tab_bar():
             st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ── Tab 0: Visão Geral ────────────────────────────────────────────────────────
+# ── Tab 0: Resumo ────────────────────────────────────────────────────────────
+
+def _build_summary(stats: dict, username: str) -> str:
+    platform  = "Lichess" if st.session_state.platform == "lichess" else "Chess.com"
+    persp     = st.session_state.perspective
+    tc_list   = st.session_state.time_classes or []
+    tc_label  = "/".join(t.capitalize() for t in tc_list) if tc_list else "todas as modalidades"
+
+    rating    = stats.get("current_rating", None)
+    total     = stats.get("total_games", 0)
+    wr        = stats.get("win_rate", 0)
+    wins      = stats.get("wins", 0)
+    draws     = stats.get("draws", 0)
+    losses    = stats.get("losses", 0)
+
+    err       = stats.get("error_stats", {})
+    avg       = err.get("averages_per_game", {})
+    bp        = err.get("blunders_by_phase", {})
+    op_bl     = bp.get("opening",    0)
+    mg_bl     = bp.get("middlegame", 0)
+    eg_bl     = bp.get("endgame",    0)
+    blund_pg  = avg.get("blunder",   0)
+
+    best_w    = stats.get("best_opening_white")  or {}
+    worst_w   = stats.get("worst_opening_white") or {}
+    best_b    = stats.get("best_opening_black")  or {}
+    worst_b   = stats.get("worst_opening_black") or {}
+
+    # ── Classify win rate ──
+    if wr >= 60:   wr_desc = "excelente taxa de vitória"
+    elif wr >= 50: wr_desc = "taxa de vitória sólida"
+    elif wr >= 42: wr_desc = "taxa de vitória equilibrada"
+    else:          wr_desc = "taxa de vitória abaixo da média"
+
+    # ── Identify critical phase ──
+    phase_vals = {"abertura": op_bl, "meio-jogo": mg_bl, "final": eg_bl}
+    worst_phase = max(phase_vals, key=phase_vals.get)
+    best_phase  = min(phase_vals, key=phase_vals.get)
+
+    # ── Rating context ──
+    rating_str = f"rating {rating}" if rating and rating != "N/A" else "rating não disponível"
+
+    # ── Opening highlights ──
+    op_w_txt = (f"{best_w['opening']} ({best_w['win_rate']:.0f}% de vitória)"
+                if best_w.get("opening") else "variada")
+    op_b_txt = (f"{best_b['opening']} ({best_b['win_rate']:.0f}%)"
+                if best_b.get("opening") else "variada")
+    weak_w_txt = (f"{worst_w['opening']} ({worst_w['win_rate']:.0f}%)"
+                  if worst_w.get("opening") else None)
+
+    # ── Style hint ──
+    if eg_bl > mg_bl * 1.5:
+        style_hint = "O padrão de erros sugere um jogador mais confortável em posições abertas do que em finais técnicos."
+    elif mg_bl > eg_bl * 1.5:
+        style_hint = "O padrão de erros sugere dificuldade nas tensões táticas do meio-jogo, com mais segurança nos finais."
+    else:
+        style_hint = "O desempenho é relativamente uniforme entre as fases, sem uma vulnerabilidade dominante isolada."
+
+    # ── Opponent hook ──
+    if eg_bl >= 1.5:
+        opp_hook = f"pode ser vencido forçando finais técnicos — {eg_bl:.1f} blunders/partida nessa fase revelam fragilidade clara"
+    elif mg_bl >= 1.2:
+        opp_hook = f"pode ser vencido com complicações táticas no meio-jogo, onde registra {mg_bl:.1f} blunders/partida"
+    elif weak_w_txt:
+        opp_hook = f"pode ser vulnerável ao enfrentar {worst_w.get('opening','—')} com brancas ({worst_w.get('win_rate',0):.0f}% de aproveitamento)"
+    else:
+        opp_hook = "apresenta maior consistência global, sendo mais difícil de explorar — foque em forçar posições desconhecidas"
+
+    # ── Assemble paragraph ──
+    c_txt   = C["txt"]
+    c_green = C["green"]
+    c_red   = C["red"]
+    name_cap = username.capitalize()
+    best_val  = f"{phase_vals[best_phase]:.1f}"
+    worst_val = f"{phase_vals[worst_phase]:.1f}"
+
+    lines = [
+        f"<strong style='color:{c_txt}'>{name_cap}</strong> "
+        f"joga {tc_label} no {platform} com {rating_str} e {wr_desc} "
+        f"({wr:.0f}% em {total} partidas — {wins}V/{draws}E/{losses}D).",
+
+        f"Com brancas, sua abertura mais forte é {op_w_txt}; "
+        f"com pretas prefere {op_b_txt}.",
+
+        f"A fase mais sólida é o <strong style='color:{c_green}'>{best_phase}</strong> "
+        f"({best_val} blunders/partida), "
+        f"enquanto o <strong style='color:{c_red}'>{worst_phase}</strong> "
+        f"concentra a maior vulnerabilidade ({worst_val} blunders/partida).",
+
+        style_hint,
+
+        f"Como adversário, <strong style='color:{c_txt}'>{name_cap}</strong> "
+        + opp_hook + ".",
+    ]
+    return " ".join(lines)
+
+
+def render_tab_summary():
+    stats    = st.session_state.stats
+    username = st.session_state.username
+    persp    = st.session_state.perspective
+    platform = "Lichess" if st.session_state.platform == "lichess" else "Chess.com"
+    total    = stats.get("total_games", 0)
+    rating   = stats.get("current_rating", "—")
+    wr       = stats.get("win_rate", 0)
+
+    is_self   = (persp == "self")
+    badge_cls = "cs-badge-self" if is_self else "cs-badge-opp"
+    badge_txt = "♔ MEU DIAGNÓSTICO" if is_self else "♚ GUIA DO ADVERSÁRIO"
+
+    # header strip
+    hdr_bg  = C["greenBg"] if is_self else C["redBg"]
+    hdr_bdr = C["greenBdr"] if is_self else C["redBdr"]
+    st.markdown(
+        f'<div style="background:{hdr_bg};border:1px solid {hdr_bdr};'
+        f'border-radius:10px;padding:12px 18px;margin-bottom:14px;'
+        f'display:flex;align-items:center;justify-content:space-between">'
+        f'<div style="font-family:\'Courier New\',monospace;font-size:10px;'
+        f'letter-spacing:0.14em;color:{C["green"] if is_self else C["red"]}">'
+        f'{badge_txt}</div>'
+        f'<div style="font-family:\'Courier New\',monospace;font-size:10px;'
+        f'color:{C["txtMuted"]}">{platform} · {total} partidas</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # narrative paragraph
+    summary = _build_summary(stats, username)
+    st.markdown(
+        f'<div class="cs-card" style="line-height:1.85">'
+        f'<div class="cs-section-lbl">ANÁLISE GERAL</div>'
+        f'<div style="font-family:Georgia,\'Times New Roman\',serif;'
+        f'font-size:14px;color:{C["txtMid"]}">'
+        f'{summary}'
+        f'</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # quick stats strip below paragraph
+    err    = stats.get("error_stats", {})
+    bp     = err.get("blunders_by_phase", {})
+    avg    = err.get("averages_per_game", {})
+    best_w = stats.get("best_opening_white") or {}
+    best_b = stats.get("best_opening_black") or {}
+
+    highlights = [
+        (C["primary"], rating,           "Rating"),
+        (C["green"],   f"{wr:.0f}%",     "Vitórias"),
+        (C["red"],     f"{avg.get('blunder', 0):.1f}", "Blunders/jogo"),
+        (C["gold"],    best_w.get("opening", "—") or "—", "Melhor c/ brancas"),
+        (C["amber"],   best_b.get("opening", "—") or "—", "Melhor c/ pretas"),
+    ]
+    cols_html = ""
+    for color, val, lbl in highlights:
+        cols_html += (
+            f'<div style="text-align:center;flex:1;min-width:0">'
+            f'<div style="font-family:Georgia,serif;font-size:18px;font-weight:bold;'
+            f'color:{color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+            f'{val}</div>'
+            f'<div style="font-family:\'Courier New\',monospace;font-size:9px;'
+            f'color:{C["txtMuted"]};letter-spacing:0.12em;text-transform:uppercase;'
+            f'margin-top:4px">{lbl}</div>'
+            f'</div>'
+        )
+    st.markdown(
+        f'<div style="display:flex;gap:8px;background:{C["card"]};'
+        f'border:1px solid {C["border"]};border-radius:10px;padding:16px 12px">'
+        f'{cols_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+# ── Tab 1: Visão Geral ────────────────────────────────────────────────────────
 
 def _score_color(v: float) -> str:
     return C["green"] if v > 64 else (C["gold"] if v > 46 else C["red"])
@@ -1745,12 +1919,14 @@ if st.session_state.stats:
     st.markdown('<div class="cs-tab-content">', unsafe_allow_html=True)
     tab = st.session_state.active_tab
     if tab == 0:
-        render_tab_overview()
+        render_tab_summary()
     elif tab == 1:
-        render_tab_errors()
+        render_tab_overview()
     elif tab == 2:
-        render_tab_openings()
+        render_tab_errors()
     elif tab == 3:
+        render_tab_openings()
+    elif tab == 4:
         render_tab_report()
     st.markdown('</div>', unsafe_allow_html=True)
 
