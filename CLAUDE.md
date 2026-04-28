@@ -4,6 +4,10 @@
 
 **Sempre commitar e fazer push direto em `main`.** Este é um protótipo sem risco — não usar feature branches. Todo commit e deploy vai direto para main.
 
+## Design — fonte única da verdade
+
+**`HANDOFF-DESIGN.md` é a especificação inegociável do design.** Toda decisão visual (paleta, tipografia, layout, componentes, responsividade) deve ser consultada e respeitada a partir desse documento. Não existe outra referência visual — `ref-design/` foi removida.
+
 Ferramenta de análise de jogadores do Chess.com que gera dois relatórios: diagnóstico do jogador e guia de como vencê-lo.
 
 ## Como rodar
