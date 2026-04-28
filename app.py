@@ -106,7 +106,7 @@ body, .stApp {{
     margin: 0; padding: 0;
 }}
 .block-container {{
-    padding: 0 !important;
+    padding: 56px 20px 48px !important;
     max-width: 100% !important;
 }}
 section[data-testid="stMain"] > div {{ padding: 0 !important; }}
@@ -136,17 +136,9 @@ section[data-testid="stMain"] > div {{ padding: 0 !important; }}
 }}
 
 /* ── Page scaffold ──────────────────────────────────────────────────────────── */
-.cs-page {{
-    padding-top: 56px; min-height: 100vh;
-    display: flex; flex-direction: column;
-    background: {C["bg"]};
-}}
-.cs-main {{
-    flex: 1; display: flex; flex-direction: column;
-    align-items: center; padding: 48px 20px;
-}}
-.cs-wizard-wrap  {{ width:100%; max-width:520px; }}
-.cs-results-wrap {{ width:100%; max-width:800px; }}
+.cs-page, .cs-main {{ display: contents; }}
+.cs-wizard-wrap  {{ width:100%; max-width:520px; margin:0 auto; }}
+.cs-results-wrap {{ width:100%; max-width:800px; margin:0 auto; }}
 
 /* ── Footer ─────────────────────────────────────────────────────────────────── */
 .cs-footer {{

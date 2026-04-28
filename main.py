@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from modules.fetcher import fetch_games
 from modules.analyzer import analyze_games
