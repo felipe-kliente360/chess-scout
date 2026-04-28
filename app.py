@@ -38,11 +38,36 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("♟ Chess Scout")
-st.caption("Analise jogadores do Chess.com e descubra como vencê-los")
+st.caption("Analise jogadores do Lichess ou Chess.com e descubra como vencê-los")
+
+PLATFORM_LABELS = {"Lichess": "lichess", "Chess.com": "chesscom"}
+PLATFORM_PLACEHOLDER = {
+    "lichess":  "ex: DrNykterstein",
+    "chesscom": "ex: magnuscarlsen",
+}
+PLATFORM_HELP = {
+    "lichess":  "API pública, funciona de qualquer rede.",
+    "chesscom": "API pública, pode bloquear IPs de servidores/datacenter.",
+}
 
 with st.sidebar:
     st.header("Configuração")
-    username_input = st.text_input("Username do Chess.com", placeholder="ex: magnuscarlsen")
+
+    selected_platform_label = st.radio(
+        "Plataforma",
+        list(PLATFORM_LABELS.keys()),
+        horizontal=True,
+    )
+    platform = PLATFORM_LABELS[selected_platform_label]
+    st.caption(PLATFORM_HELP[platform])
+
+    st.divider()
+
+    username_input = st.text_input(
+        "Username",
+        placeholder=PLATFORM_PLACEHOLDER[platform],
+    )
+
     time_class_options = {"Todas": None, "Blitz": "blitz", "Rapid": "rapid", "Bullet": "bullet"}
     selected_tc = st.selectbox("Modalidade", list(time_class_options.keys()))
     time_class_filter = time_class_options[selected_tc]
@@ -51,17 +76,18 @@ with st.sidebar:
 
     if "diagnostic_md" in st.session_state:
         st.divider()
+        analyzed_username = st.session_state["analyzed_username"]
         st.download_button(
             "⬇ Baixar DIAGNOSTICO.md",
             data=st.session_state["diagnostic_md"],
-            file_name=f"DIAGNOSTICO_{st.session_state['analyzed_username']}.md",
+            file_name=f"DIAGNOSTICO_{analyzed_username}.md",
             mime="text/markdown",
             use_container_width=True,
         )
         st.download_button(
             "⬇ Baixar GUIA_ADVERSARIO.md",
             data=st.session_state["guide_md"],
-            file_name=f"GUIA_ADVERSARIO_{st.session_state['analyzed_username']}.md",
+            file_name=f"GUIA_ADVERSARIO_{analyzed_username}.md",
             mime="text/markdown",
             use_container_width=True,
         )
@@ -72,7 +98,7 @@ if analyze_btn and username_input:
     progress_bar = st.progress(0)
     status_text = st.empty()
 
-    status_text.text("Buscando partidas...")
+    status_text.text(f"Buscando partidas no {selected_platform_label}...")
     progress_bar.progress(5)
 
     try:
@@ -85,6 +111,7 @@ if analyze_btn and username_input:
             username,
             target=100,
             time_class_filter=time_class_filter,
+            platform=platform,
             progress_callback=fetch_progress,
         )
         progress_bar.progress(30)
@@ -104,7 +131,10 @@ if analyze_btn and username_input:
 
             analyzed_games = analyze_games(games, username, progress_callback=analysis_progress)
         except FileNotFoundError:
-            st.warning("Stockfish não encontrado — análise de movimentos desabilitada. Instale com `brew install stockfish` ou `apt install stockfish`.")
+            st.warning(
+                "Stockfish não encontrado — análise de movimentos desabilitada. "
+                "Instale com `brew install stockfish` (Mac) ou `sudo apt install stockfish` (Linux)."
+            )
             analyzed_games = games
 
         progress_bar.progress(75)
@@ -119,13 +149,16 @@ if analyze_btn and username_input:
 
         progress_bar.progress(100)
         status_text.text("Análise concluída!")
-        time.sleep(0.5)
+        time.sleep(0.4)
 
-        st.session_state["stats"] = stats
-        st.session_state["profile"] = profile
-        st.session_state["diagnostic_md"] = diagnostic_md
-        st.session_state["guide_md"] = guide_md
-        st.session_state["analyzed_username"] = username
+        st.session_state.update({
+            "stats": stats,
+            "profile": profile,
+            "diagnostic_md": diagnostic_md,
+            "guide_md": guide_md,
+            "analyzed_username": username,
+            "platform_label": selected_platform_label,
+        })
 
         progress_bar.empty()
         status_text.empty()
@@ -138,9 +171,10 @@ if analyze_btn and username_input:
         st.stop()
 
 if "stats" in st.session_state:
-    stats = st.session_state["stats"]
-    profile = st.session_state["profile"]
+    stats            = st.session_state["stats"]
+    profile          = st.session_state["profile"]
     analyzed_username = st.session_state["analyzed_username"]
+    platform_label   = st.session_state.get("platform_label", "")
 
     tab1, tab2, tab3, tab4 = st.tabs(["Visão Geral", "Análise de Erros", "Aberturas", "Relatórios Completos"])
 
@@ -154,15 +188,17 @@ if "stats" in st.session_state:
             else:
                 st.markdown("### ♟")
             st.markdown(f"**{profile.get('username', analyzed_username)}**")
+            if platform_label:
+                st.caption(platform_label)
             country = profile.get("country", "")
             if country:
-                st.caption(country.split("/")[-1])
+                st.caption(country.split("/")[-1] if "/" in country else country)
 
         with col_info:
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Rating", stats.get("current_rating", "N/A"))
-            m2.metric("Partidas", stats.get("total_games", 0))
-            m3.metric("Taxa de Vitória", f"{stats.get('win_rate', 0):.1f}%")
+            m1.metric("Rating",            stats.get("current_rating", "N/A"))
+            m2.metric("Partidas",          stats.get("total_games", 0))
+            m3.metric("Taxa de Vitória",   f"{stats.get('win_rate', 0):.1f}%")
             m4.metric("Oponentes (média)", stats.get("avg_opponent_rating", "N/A"))
 
         st.divider()
@@ -171,12 +207,9 @@ if "stats" in st.session_state:
 
         with col_pie:
             st.subheader("Resultados Gerais")
-            wins = stats.get("wins", 0)
-            losses = stats.get("losses", 0)
-            draws = stats.get("draws", 0)
             fig_pie = px.pie(
                 names=["Vitórias", "Derrotas", "Empates"],
-                values=[wins, losses, draws],
+                values=[stats.get("wins", 0), stats.get("losses", 0), stats.get("draws", 0)],
                 color_discrete_sequence=["#a6e3a1", "#f38ba8", "#89b4fa"],
                 hole=0.4,
             )
@@ -192,8 +225,7 @@ if "stats" in st.session_state:
                     for k, v in tc_stats.items()
                 ])
                 fig_bar = px.bar(
-                    tc_df,
-                    x="Modalidade",
+                    tc_df, x="Modalidade",
                     y=["Vitórias", "Derrotas", "Empates"],
                     color_discrete_sequence=["#a6e3a1", "#f38ba8", "#89b4fa"],
                     barmode="group",
@@ -203,8 +235,8 @@ if "stats" in st.session_state:
 
     with tab2:
         error_stats = stats.get("error_stats", {})
-        averages = error_stats.get("averages_per_game", {})
-        bp = error_stats.get("blunders_by_phase", {})
+        averages    = error_stats.get("averages_per_game", {})
+        bp          = error_stats.get("blunders_by_phase", {})
 
         if averages:
             col_e1, col_e2 = st.columns(2)
@@ -212,11 +244,11 @@ if "stats" in st.session_state:
             with col_e1:
                 st.subheader("Média de Movimentos por Partida")
                 labels_pt = {
-                    "excellent": "Excelente",
-                    "good": "Boa",
+                    "excellent":  "Excelente",
+                    "good":       "Boa",
                     "inaccuracy": "Imprecisão",
-                    "mistake": "Erro",
-                    "blunder": "Blunder",
+                    "mistake":    "Erro",
+                    "blunder":    "Blunder",
                 }
                 colors = ["#a6e3a1", "#89b4fa", "#fab387", "#f38ba8", "#cba6f7"]
                 avg_data = {labels_pt.get(k, k): v for k, v in averages.items()}
@@ -225,7 +257,7 @@ if "stats" in st.session_state:
                     y=list(avg_data.values()),
                     marker_color=colors[:len(avg_data)],
                 ))
-                fig_avg.update_layout(margin=dict(t=10, b=10), xaxis_title="", yaxis_title="Média")
+                fig_avg.update_layout(margin=dict(t=10, b=10), yaxis_title="Média")
                 st.plotly_chart(fig_avg, use_container_width=True)
 
             with col_e2:
@@ -241,24 +273,22 @@ if "stats" in st.session_state:
                     fig_phase.update_layout(margin=dict(t=10, b=10))
                     st.plotly_chart(fig_phase, use_container_width=True)
 
-            st.subheader("Top 5 Tipos de Erro")
+            st.subheader("Top Tipos de Erro")
             top_errors = error_stats.get("top_errors", [])
             if top_errors:
-                err_df = pd.DataFrame(top_errors)
-                st.dataframe(err_df, use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(top_errors), use_container_width=True, hide_index=True)
         else:
             st.info("Análise de erros não disponível (Stockfish não encontrado).")
 
     with tab3:
         openings_white = stats.get("openings_white", [])
         openings_black = stats.get("openings_black", [])
-
         col_w, col_b = st.columns(2)
 
         with col_w:
             st.subheader("Com Brancas")
             if openings_white:
-                best_w = stats.get("best_opening_white")
+                best_w  = stats.get("best_opening_white")
                 worst_w = stats.get("worst_opening_white")
                 if best_w:
                     st.success(f"Melhor: {best_w['opening']} ({best_w['win_rate']:.1f}% em {best_w['games']} partidas)")
@@ -271,7 +301,7 @@ if "stats" in st.session_state:
         with col_b:
             st.subheader("Com Pretas")
             if openings_black:
-                best_b = stats.get("best_opening_black")
+                best_b  = stats.get("best_opening_black")
                 worst_b = stats.get("worst_opening_black")
                 if best_b:
                     st.success(f"Melhor: {best_b['opening']} ({best_b['win_rate']:.1f}% em {best_b['games']} partidas)")
@@ -283,28 +313,35 @@ if "stats" in st.session_state:
 
     with tab4:
         col_diag, col_guide = st.columns(2)
-
         with col_diag:
             st.subheader("Diagnóstico")
             st.markdown(st.session_state["diagnostic_md"])
-
         with col_guide:
             st.subheader("Guia do Adversário")
             st.markdown(st.session_state["guide_md"])
 
 else:
-    st.info("Digite um username na barra lateral e clique em **Analisar Jogador** para começar.")
+    st.info("Configure o jogador na barra lateral e clique em **Analisar Jogador** para começar.")
     st.markdown("""
 ### Como usar
 
-1. Digite o username de qualquer jogador do Chess.com na barra lateral
-2. Escolha a modalidade (ou deixe em "Todas")
-3. Clique em **Analisar Jogador**
-4. Explore os relatórios nas abas
+1. Escolha a plataforma: **Lichess** (recomendado) ou **Chess.com**
+2. Digite o username do jogador
+3. Escolha a modalidade (ou deixe em "Todas")
+4. Clique em **Analisar Jogador**
 
 ### O que você vai obter
 
-- **Diagnóstico completo** do jogador com pontos fortes, fracos e plano de estudo
+- **Diagnóstico completo** com pontos fortes, fracos e plano de estudo
 - **Guia do adversário** com estratégias específicas para vencê-lo
 - Análise de aberturas, erros por fase e perfil de jogo
+
+### Lichess vs Chess.com
+
+| | Lichess | Chess.com |
+|---|---|---|
+| API pública | Sim | Sim |
+| Funciona de servidores | **Sim** | Não |
+| Dados de abertura | Sim | Sim |
+| Necessita conta | Não | Não |
     """)

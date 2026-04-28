@@ -1,5 +1,4 @@
 import sys
-import os
 from modules.fetcher import fetch_games
 from modules.analyzer import analyze_games
 from modules.stats import compute_stats
@@ -14,14 +13,27 @@ def print_step(step: str):
 
 def main():
     if len(sys.argv) < 2:
-        print("Uso: python main.py <username>")
-        print("Exemplo: python main.py magnuscarlsen")
+        print("Uso: python main.py <username> [plataforma] [modalidade]")
+        print()
+        print("  plataforma : lichess (padrão) | chesscom")
+        print("  modalidade : blitz | rapid | bullet  (padrão: todas)")
+        print()
+        print("Exemplos:")
+        print("  python main.py DrNykterstein")
+        print("  python main.py DrNykterstein lichess blitz")
+        print("  python main.py magnuscarlsen chesscom")
         sys.exit(1)
 
-    username = sys.argv[1]
-    time_class = sys.argv[2] if len(sys.argv) > 2 else None
+    username   = sys.argv[1]
+    platform   = sys.argv[2] if len(sys.argv) > 2 else "lichess"
+    time_class = sys.argv[3] if len(sys.argv) > 3 else None
 
-    print(f"\nChess Scout — Analisando: {username}")
+    if platform not in ("lichess", "chesscom"):
+        print(f"Plataforma inválida: '{platform}'. Use 'lichess' ou 'chesscom'.")
+        sys.exit(1)
+
+    platform_label = "Lichess" if platform == "lichess" else "Chess.com"
+    print(f"\nChess Scout — {platform_label} — Analisando: {username}")
     if time_class:
         print(f"Modalidade: {time_class}")
 
@@ -31,7 +43,13 @@ def main():
         print(f"  Partidas encontradas: {found}/{target}", end="\r")
 
     try:
-        profile, games = fetch_games(username, target=100, time_class_filter=time_class, progress_callback=fetch_progress)
+        profile, games = fetch_games(
+            username,
+            target=100,
+            time_class_filter=time_class,
+            platform=platform,
+            progress_callback=fetch_progress,
+        )
     except ValueError as e:
         print(f"\nErro: {e}")
         sys.exit(1)
@@ -58,18 +76,16 @@ def main():
     print_step("3/4 Calculando estatísticas...")
     stats = compute_stats(analyzed_games, username)
     print(f"  Taxa de vitória: {stats.get('win_rate', 0):.1f}%")
-    print(f"  Rating atual: {stats.get('current_rating', 'N/A')}")
+    print(f"  Rating atual:    {stats.get('current_rating', 'N/A')}")
 
     print_step("4/4 Gerando relatórios...")
-    diagnostic = generate_diagnostic(stats, username)
+    diagnostic    = generate_diagnostic(stats, username)
     opponent_guide = generate_opponent_guide(stats, username)
-
     diag_path, guide_path = save_reports(username, diagnostic, opponent_guide)
 
     print(f"\n  Relatórios salvos em:")
-    print(f"  DIAGNOSTICO:      {diag_path}")
-    print(f"  GUIA ADVERSARIO:  {guide_path}")
-
+    print(f"  DIAGNOSTICO:     {diag_path}")
+    print(f"  GUIA ADVERSARIO: {guide_path}")
     print("\n" + "="*50)
     print("  Análise concluída!")
     print("="*50 + "\n")
