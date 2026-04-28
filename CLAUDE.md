@@ -49,7 +49,26 @@ chess-scout/
 ├── modules/
 │   ├── fetcher.py      # Busca partidas na API do Chess.com
 │   ├── analyzer.py     # Analisa partidas com python-chess + Stockfish
-│   ├── stats.py        # Calcula estatísticas e padrões
-│   └── reporter.py     # Gera os relatórios em markdown
+│   ├── stats.py        # Calcula estatísticas e padrões (inclui ACPL)
+│   └── reporter.py     # Gera os relatórios em markdown (Claude API + fallback)
+├── exemplo-report/     # Referência de qualidade: análise profunda de Magnus Carlsen
 └── outputs/            # Relatórios gerados
 ```
+
+## Qualidade dos Relatórios
+
+Os relatórios devem ter profundidade similar à análise profissional de grandes mestres disponível em `exemplo-report/`. Consulte esse documento como referência de estilo e profundidade ao modificar `modules/reporter.py`.
+
+Características-chave do padrão de qualidade almejado:
+- Prosa analítica fluida (não apenas tabelas e bullet points)
+- Análise por fase do jogo (abertura / meio de jogo / final)
+- Perfil psicológico baseado nos padrões de erros
+- Planos acionáveis com prioridades claras
+- ACPL (Average Centipawn Loss) como métrica central de qualidade
+- Perspectiva dupla: diagnóstico do jogador + guia para vencê-lo
+
+### Claude API (geração narrativa)
+
+`reporter.py` usa o modelo `claude-opus-4-7` quando `ANTHROPIC_API_KEY` está definida. Sem a chave, cai automaticamente para templates estáticos com a mesma estrutura. O prompt do sistema usa `cache_control: ephemeral` para reduzir custo em chamadas repetidas.
+
+Ver `REFERENCE.md` para a estrutura completa dos relatórios.

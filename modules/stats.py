@@ -143,6 +143,17 @@ def _compute_error_stats(analyzed_games: list[dict]) -> dict:
 
     averages = {k: round(v / total_analyzed, 2) for k, v in totals.items()}
 
+    total_cp_loss = sum(
+        m.get("cp_loss", 0)
+        for g in analyzed_games
+        for m in g.get("analysis", {}).get("moves_detail", [])
+    )
+    total_moves_detail = sum(
+        len(g.get("analysis", {}).get("moves_detail", []))
+        for g in analyzed_games
+    )
+    acpl = round(total_cp_loss / total_moves_detail, 1) if total_moves_detail > 0 else 0.0
+
     top_errors = [
         {"type": "Blunder",    "count": totals.get("blunder", 0),    "avg_por_partida": averages.get("blunder", 0)},
         {"type": "Erro",       "count": totals.get("mistake", 0),    "avg_por_partida": averages.get("mistake", 0)},
@@ -157,6 +168,7 @@ def _compute_error_stats(analyzed_games: list[dict]) -> dict:
         "blunders_by_phase": dict(phase_blunders),
         "top_errors": top_errors[:5],
         "games_analyzed": total_analyzed,
+        "acpl": acpl,
     }
 
 
