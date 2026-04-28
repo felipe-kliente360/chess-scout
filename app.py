@@ -8,7 +8,7 @@ from modules.stats import compute_stats
 from modules.reporter import generate_diagnostic, generate_opponent_guide, save_reports, md_to_pdf
 from modules.ui import (
     DOSSIE, build_css,
-    donut_svg, radar_svg, color_bar, section_lbl,
+    donut_svg, radar_svg, color_bar, section_lbl, chessboard_svg,
     render_header, render_footer, render_stepper, prog_html,
 )
 
@@ -776,6 +776,50 @@ def render_screen_overview():
 
 # ── Screen IV-A: Personal ─────────────────────────────────────────────────────
 
+def _build_study_plan(stats: dict) -> list[dict]:
+    """Derive a 4-week study plan from computed stats."""
+    err    = stats.get("error_stats", {})
+    bp     = err.get("blunders_by_phase", {})
+    style  = stats.get("play_style", {}).get("style", "agressivo")
+    w_open = stats.get("worst_opening_white") or {}
+    b_open = stats.get("worst_opening_black") or {}
+    worst_op = w_open.get("opening") or b_open.get("opening") or "sua abertura mais fraca"
+
+    # Identify worst phase
+    phase_map = {"opening": "Abertura", "middlegame": "Meio-jogo", "endgame": "Final"}
+    worst_phase_key = max(bp, key=bp.get) if bp else "middlegame"
+    worst_phase_pt  = phase_map.get(worst_phase_key, "Meio-jogo")
+
+    tactics_focus = "Treinar garfos, espetos e pinos" if style == "agressivo" else "Treinar bloqueios e defesa ativa"
+
+    return [
+        {
+            "num":   "SEMANA 01",
+            "title": f"Controlar a {worst_phase_pt}",
+            "body":  f"Revisar os lances problemáticos da fase de {worst_phase_pt.lower()}. Resolver 10 puzzles/dia focados nessa fase. Rever os blunders dos últimos 10 jogos.",
+            "active": True,
+        },
+        {
+            "num":   "SEMANA 02",
+            "title": "Reforçar Aberturas",
+            "body":  f"Estudar e memorizar variantes contra {worst_op}. Construir um repertório mínimo com 2 aberturas sólidas com Brancas e 1 defesa com Pretas.",
+            "active": False,
+        },
+        {
+            "num":   "SEMANA 03",
+            "title": "Padrões Táticos",
+            "body":  f"{tactics_focus}. Completar 15 puzzles táticos/dia em plataforma (Chess.com Puzzles ou Lichess). Focar em padrões que surgem no seu repertório.",
+            "active": False,
+        },
+        {
+            "num":   "SEMANA 04",
+            "title": "Consolidação e Revisão",
+            "body":  "Jogar 10 partidas aplicando as melhorias. Revisar com engine uma partida por dia. Ajustar o plano com base nos novos padrões de erro.",
+            "active": False,
+        },
+    ]
+
+
 def render_screen_personal():
     stats    = st.session_state.stats
     username = st.session_state.username
@@ -820,6 +864,22 @@ def render_screen_personal():
         f'<div class="ds-acpl-lbl">ACPL — PERDA MÉDIA POR LANCE</div>'
         f'<div class="ds-acpl-interp">{acpl_interp}</div>'
         f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Study plan — 4 weeks
+    plan = _build_study_plan(stats)
+    cards_html = "".join(
+        f'<div class="ds-week-card{"  ds-week-card-active" if w["active"] else ""}">'
+        f'<div class="ds-week-num">{w["num"]}</div>'
+        f'<div class="ds-week-title">{w["title"]}</div>'
+        f'<div class="ds-week-body">{w["body"]}</div>'
+        f'</div>'
+        for w in plan
+    )
+    st.markdown(
+        f'<div class="ds-section-lbl" style="margin-top:20px">PLANO DE ESTUDO — 4 SEMANAS</div>'
+        f'<div class="ds-week-grid">{cards_html}</div>',
         unsafe_allow_html=True,
     )
 

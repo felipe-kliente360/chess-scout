@@ -289,6 +289,38 @@ section[data-testid="stMain"] > div {{ padding: 0 !important; }}
     display: flex; justify-content: center; gap: 14px;
     margin-top: 24px; font-size: 24px; opacity: 0.35;
 }}
+.ds-prog-grid {{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px; margin-top: 20px;
+}}
+.ds-prog-board {{ display: none; }}
+
+/* ── Plano de estudo (4 semanas) ─────────────────────────────────────────── */
+.ds-week-grid {{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px; margin-bottom: 20px;
+}}
+.ds-week-card {{
+    background: {C["paper"]}; border: 1px solid {C["paperEdge"]};
+    border-radius: 4px; padding: 14px 16px;
+    border-top: 2px solid {C["borderMid"]};
+}}
+.ds-week-card-active {{ border-top-color: {C["red"]}; }}
+.ds-week-num {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: {C["inkFaint"]}; margin-bottom: 5px;
+}}
+.ds-week-title {{
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 15px; font-weight: 700; color: {C["ink"]}; margin-bottom: 6px;
+}}
+.ds-week-body {{
+    font-family: 'Inter', system-ui;
+    font-size: 12px; color: {C["inkMuted"]}; line-height: 1.6;
+}}
 
 /* ── Player card ─────────────────────────────────────────────────────────── */
 .ds-player-card {{
@@ -513,6 +545,19 @@ button[data-baseweb="tab"][aria-selected="true"] {{
     background:transparent !important; border:none !important; padding:18px 0 !important;
 }}
 
+/* ── Tablet (≥768px) ─────────────────────────────────────────────────────── */
+@media (min-width: 768px) {{
+    .ds-prog-grid {{ grid-template-columns: 1fr 180px; align-items: start; }}
+    .ds-prog-board {{ display: block; }}
+    .ds-week-grid {{ grid-template-columns: repeat(2, 1fr); }}
+}}
+
+/* ── Desktop (≥1024px) ───────────────────────────────────────────────────── */
+@media (min-width: 1024px) {{
+    .ds-week-grid {{ grid-template-columns: repeat(4, 1fr); }}
+    .ds-results-wrap {{ padding: 0 16px; }}
+}}
+
 /* ── Print ───────────────────────────────────────────────────────────────── */
 @media print {{
     .ds-header, .ds-footer, [data-testid="stButton"] {{ display:none !important; }}
@@ -654,6 +699,26 @@ def section_lbl(text: str) -> str:
     return f'<div class="ds-section-lbl">{text}</div>'
 
 
+def chessboard_svg(C: dict | None = None) -> str:
+    """Static decorative 8×8 board SVG in dossie palette."""
+    if C is None:
+        C = DOSSIE
+    sq = 22  # square size px
+    board_size = sq * 8
+    squares = ""
+    for row in range(8):
+        for col in range(8):
+            light = (row + col) % 2 == 0
+            fill = C["paper"] if light else C["border"]
+            x, y = col * sq, row * sq
+            squares += f'<rect x="{x}" y="{y}" width="{sq}" height="{sq}" fill="{fill}"/>'
+    return (
+        f'<svg width="{board_size}" height="{board_size}" viewBox="0 0 {board_size} {board_size}" '
+        f'style="display:block;border:1px solid {C["paperEdge"]};border-radius:2px;opacity:0.6">'
+        f'{squares}</svg>'
+    )
+
+
 # ── Render helpers (require streamlit) ────────────────────────────────────────
 
 def render_header() -> None:
@@ -732,12 +797,18 @@ def prog_html(msg: str, pct: int, log_lines: list[str],
         for p, t in zip(pieces, thresholds)
     )
     log_html = "".join(f"<div>→ {line}</div>" for line in log_lines[-8:])
+    board = chessboard_svg(C)
     return f"""
 <div class="ds-prog-bar-bg"><div class="ds-prog-bar-fill" style="width:{pct}%"></div></div>
 <div class="ds-prog-status">
   <span class="ds-prog-msg">{msg}</span>
   <span class="ds-prog-pct">{pct}%</span>
 </div>
-<div class="ds-prog-log">{log_html}</div>
-<div class="ds-prog-pieces">{piece_html}</div>
+<div class="ds-prog-grid">
+  <div>
+    <div class="ds-prog-log">{log_html}</div>
+    <div class="ds-prog-pieces">{piece_html}</div>
+  </div>
+  <div class="ds-prog-board">{board}</div>
+</div>
 """
