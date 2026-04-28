@@ -16,6 +16,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ── Theme from query param (toggled by HTML anchor in header) ─────────────────
+_qp_theme = st.query_params.get("theme", None)
+if _qp_theme in ("dark", "light"):
+    st.session_state["theme"] = _qp_theme
+
 # ── Session state defaults ────────────────────────────────────────────────────
 _DEFAULTS: dict = {
     "theme":         "dark",
@@ -28,7 +33,6 @@ _DEFAULTS: dict = {
     "profile":       None,
     "diagnostic_md": None,
     "guide_md":      None,
-    "active_tab":    0,
     "analyzing":     False,
     "analyze_pct":   0,
     "analyze_msg":   "",
@@ -237,7 +241,7 @@ section[data-testid="stMain"] > div {{ padding: 0 !important; }}
 .cs-nav {{ display:flex; justify-content:space-between; align-items:center; margin-top:44px; }}
 .cs-nav-ph {{ min-width:80px; }}
 
-/* Override Streamlit buttons ─────────────────────────────────────────────────── */
+/* Streamlit buttons — kind-based selectors (wrapper divs are siblings, not parents) */
 [data-testid="stButton"] > button {{
     border-radius: 8px !important;
     font-family: 'Courier New',Courier,monospace !important;
@@ -245,48 +249,40 @@ section[data-testid="stMain"] > div {{ padding: 0 !important; }}
     letter-spacing: 0.08em !important;
     transition: opacity 0.2s !important;
 }}
-.btn-primary [data-testid="stButton"] > button {{
+[data-testid="stButton"] > button[kind="primary"] {{
     height:42px !important; padding:0 22px !important; font-size:13px !important;
     background:{C["primary"]} !important; color:#fff !important; border:none !important;
 }}
-.btn-ghost [data-testid="stButton"] > button {{
+[data-testid="stButton"] > button[kind="secondary"] {{
     height:42px !important; padding:0 22px !important; font-size:13px !important;
     background:transparent !important; color:{C["txtMuted"]} !important;
     border:1px solid {C["border"]} !important;
 }}
-.btn-small [data-testid="stButton"] > button {{
+[data-testid="stDownloadButton"] > button {{
     height:32px !important; padding:0 14px !important; font-size:11px !important;
     background:{C["primary"]} !important; color:#fff !important; border:none !important;
-}}
-.btn-theme [data-testid="stButton"] > button {{
-    background:rgba(255,255,255,0.1) !important; color:#fff !important;
-    border:1px solid rgba(255,255,255,0.2) !important;
-    border-radius:20px !important;
-    height:36px !important; padding:0 12px !important; font-size:12px !important;
-}}
-.btn-tab [data-testid="stButton"] > button {{
-    height:44px !important; width:100% !important;
-    border:none !important; border-radius:0 !important;
+    border-radius:8px !important;
     font-family:'Courier New',Courier,monospace !important;
-    font-size:11px !important; letter-spacing:0.08em !important;
-    text-transform:uppercase !important;
-    background:{C["card"]} !important; color:{C["txtMuted"]} !important;
-    border-bottom:3px solid transparent !important;
+    font-weight:600 !important; letter-spacing:0.08em !important;
 }}
-.btn-tab-active [data-testid="stButton"] > button {{
-    height:44px !important; width:100% !important;
-    border:none !important; border-radius:0 !important;
-    font-family:'Courier New',Courier,monospace !important;
-    font-size:11px !important; letter-spacing:0.08em !important;
-    text-transform:uppercase !important; font-weight:700 !important;
-    background:{C["surface"]} !important; color:{C["primary"]} !important;
-    border-bottom:3px solid {C["primary"]} !important;
+
+/* Tile backer buttons — collapsed by JS after wiring click handlers */
+.cs-tile-backer {{
+    height:0 !important; overflow:hidden !important;
+    margin:0 !important; padding:0 !important;
 }}
-.btn-reset [data-testid="stButton"] > button {{
-    height:42px !important; padding:0 22px !important; font-size:13px !important;
-    background:transparent !important; color:{C["txtMuted"]} !important;
-    border:1px solid {C["border"]} !important;
+
+/* Theme toggle anchor in fixed header */
+.cs-theme-btn {{
+    font-family:'Courier New',Courier,monospace;
+    font-size:12px; color:rgba(255,255,255,0.9);
+    background:rgba(255,255,255,0.1);
+    border:1px solid rgba(255,255,255,0.2);
+    border-radius:20px; padding:8px 14px;
+    text-decoration:none; display:inline-flex; align-items:center;
+    transition:background 0.2s;
 }}
+.cs-theme-btn:hover {{ background:rgba(255,255,255,0.2); color:#fff; }}
 
 /* ── Text input ───────────────────────────────────────────────────────────────── */
 [data-testid="stTextInput"] > div > div {{
@@ -358,16 +354,39 @@ section[data-testid="stMain"] > div {{ padding: 0 !important; }}
 .cs-badge-self {{ background:{C["greenBg"]}; border-color:{C["greenBdr"]}; color:{C["green"]}; }}
 .cs-badge-opp  {{ background:{C["redBg"]};   border-color:{C["redBdr"]};   color:{C["red"]};   }}
 
-/* ── Tab bar ──────────────────────────────────────────────────────────────────── */
-.cs-tabbar {{
-    background:{C["card"]}; border-radius:10px 10px 0 0;
-    border:1px solid {C["border"]}; border-bottom:none;
-    overflow:hidden;
+/* ── st.tabs() styling ────────────────────────────────────────────────────────── */
+[data-testid="stTabs"] {{
+    gap: 0;
 }}
-.cs-tab-content {{
-    background:{C["surface"]}; border:1px solid {C["border"]};
-    border-top:none; border-radius:0 0 14px 14px;
-    padding:24px 22px;
+button[data-baseweb="tab"] {{
+    font-family:'Courier New',Courier,monospace !important;
+    font-size:11px !important; letter-spacing:0.08em !important;
+    text-transform:uppercase !important;
+    color:{C["txtMuted"]} !important;
+    background:{C["card"]} !important;
+    border:none !important; border-radius:0 !important;
+    border-bottom:3px solid transparent !important;
+    height:44px !important; padding:0 18px !important;
+}}
+button[data-baseweb="tab"][aria-selected="true"] {{
+    color:{C["primary"]} !important;
+    border-bottom:3px solid {C["primary"]} !important;
+    font-weight:700 !important;
+    background:{C["surface"]} !important;
+}}
+[data-baseweb="tab-list"] {{
+    background:{C["card"]} !important;
+    border-radius:10px 10px 0 0 !important;
+    border:1px solid {C["border"]} !important;
+    border-bottom:none !important;
+    gap:0 !important;
+}}
+[data-baseweb="tab-panel"] {{
+    background:{C["surface"]} !important;
+    border:1px solid {C["border"]} !important;
+    border-top:none !important;
+    border-radius:0 0 14px 14px !important;
+    padding:24px 22px !important;
 }}
 
 /* ── Generic card ─────────────────────────────────────────────────────────────── */
@@ -623,8 +642,7 @@ section[data-testid="stMain"] > div {{ padding: 0 !important; }}
     .cs-tab-content {{ padding:18px 16px; }}
     .cs-tactics {{ grid-template-columns:1fr 1fr; }}
     .cs-rpt-body {{ padding:18px; }}
-    .btn-tab [data-testid="stButton"] > button {{ font-size:9px !important; }}
-    .btn-tab-active [data-testid="stButton"] > button {{ font-size:9px !important; }}
+    button[data-baseweb="tab"] {{ font-size:9px !important; }}
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -744,12 +762,41 @@ def _section_lbl(text: str) -> str:
     return f'<div class="cs-section-lbl">{text}</div>'
 
 
+# ── JS: wire tile clicks to backing buttons ───────────────────────────────────
+def _inject_tile_js():
+    """Wire .cs-tile divs to the invisible backing st.button via JS in parent frame."""
+    components.html("""
+    <script>
+    (function() {
+        var doc = window.parent.document;
+        function wireUp() {
+            doc.querySelectorAll('.cs-tile:not([data-wired])').forEach(function(tile) {
+                tile.setAttribute('data-wired', '1');
+                tile.style.cursor = 'pointer';
+                var tileEl = tile.closest('.element-container');
+                if (!tileEl) return;
+                var btnEl = tileEl.nextElementSibling;
+                if (!btnEl) return;
+                var btn = btnEl.querySelector('button');
+                if (!btn) return;
+                btnEl.classList.add('cs-tile-backer');
+                tile.addEventListener('click', function() { btn.click(); });
+            });
+        }
+        wireUp();
+        new MutationObserver(wireUp).observe(doc.body, {childList: true, subtree: true});
+    })();
+    </script>
+    """, height=0)
+
+
 # ── Header ────────────────────────────────────────────────────────────────────
 
 def render_header():
-    theme = st.session_state.theme
-    icon  = "☀" if theme == "dark" else "☽"
-    label = "Claro" if theme == "dark" else "Escuro"
+    theme     = st.session_state.theme
+    icon      = "☀" if theme == "dark" else "☽"
+    label     = "Claro" if theme == "dark" else "Escuro"
+    new_theme = "light" if theme == "dark" else "dark"
     st.markdown(f"""
     <div class="cs-header">
       <div class="cs-header-left">
@@ -757,18 +804,9 @@ def render_header():
         <span class="cs-title">CHESS SCOUT</span>
         <span class="cs-subtitle">INTELIGÊNCIA DE JOGO</span>
       </div>
+      <a href="?theme={new_theme}" class="cs-theme-btn" target="_self">{icon} {label}</a>
     </div>
     """, unsafe_allow_html=True)
-    # Theme toggle rendered as floating button via CSS tricks
-    st.markdown(
-        '<div style="position:fixed;top:10px;right:16px;z-index:10000">',
-        unsafe_allow_html=True,
-    )
-    st.markdown('<div class="btn-theme">', unsafe_allow_html=True)
-    if st.button(f"{icon} {label}", key="theme_btn"):
-        st.session_state.theme = "light" if theme == "dark" else "dark"
-        st.rerun()
-    st.markdown('</div></div>', unsafe_allow_html=True)
 
 
 # ── Footer ────────────────────────────────────────────────────────────────────
@@ -846,24 +884,16 @@ def _tile(icon: str, label: str, sub: str, selected: bool,
 
 def _nav(back_key: str, next_key: str, next_label: str = "Próximo →",
          next_disabled: bool = False, show_back: bool = True):
-    col_l, col_r = st.columns([1, 1])
+    col_l, col_m, col_r = st.columns([1, 2, 1])
     with col_l:
         if show_back:
-            st.markdown('<div class="btn-ghost">', unsafe_allow_html=True)
-            back = st.button("← Voltar", key=back_key, use_container_width=False)
-            st.markdown('</div>', unsafe_allow_html=True)
+            back = st.button("← Voltar", key=back_key, type="secondary",
+                             use_container_width=True)
         else:
             back = False
-            st.markdown('<div class="cs-nav-ph"></div>', unsafe_allow_html=True)
     with col_r:
-        st.markdown('<div style="display:flex;justify-content:flex-end">', unsafe_allow_html=True)
-        st.markdown('<div class="btn-primary">', unsafe_allow_html=True)
-        nxt = st.button(
-            next_label, key=next_key,
-            disabled=next_disabled,
-            use_container_width=False,
-        )
-        st.markdown('</div></div>', unsafe_allow_html=True)
+        nxt = st.button(next_label, key=next_key, type="primary",
+                        disabled=next_disabled, use_container_width=True)
     return back, nxt
 
 
@@ -1117,7 +1147,6 @@ def run_analysis():
             "diagnostic_md": diag,
             "guide_md":      guide,
             "analyzing":     False,
-            "active_tab":    0,
         })
 
     except ValueError as e:
@@ -1166,7 +1195,6 @@ def render_player_card():
             f'</div>',
             unsafe_allow_html=True,
         )
-        st.markdown('<div class="btn-small">', unsafe_allow_html=True)
         md_data = (st.session_state.diagnostic_md
                    if persp == "self"
                    else st.session_state.guide_md)
@@ -1176,24 +1204,6 @@ def render_player_card():
         st.download_button("↓ Exportar", data=md_data,
                            file_name=fname, mime="text/markdown",
                            key="export_btn")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-
-# ── Results: tab bar ──────────────────────────────────────────────────────────
-
-_TAB_LABELS = ["Resumo", "Visão Geral", "Erros", "Aberturas", "Relatório"]
-
-def render_tab_bar():
-    cols = st.columns(5)
-    for i, (col, lbl) in enumerate(zip(cols, _TAB_LABELS)):
-        with col:
-            active = (st.session_state.active_tab == i)
-            cls    = "btn-tab-active" if active else "btn-tab"
-            st.markdown(f'<div class="{cls}">', unsafe_allow_html=True)
-            if st.button(lbl, key=f"tab_btn_{i}", use_container_width=True):
-                st.session_state.active_tab = i
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ── Tab 0: Resumo ────────────────────────────────────────────────────────────
@@ -1748,11 +1758,10 @@ def render_tab_report():
         f'</div>',
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="btn-small">', unsafe_allow_html=True)
     st.download_button("↓ .md", data=md_data,
                        file_name=fname, mime="text/markdown",
                        key="rpt_dl_btn")
-    st.markdown('</div></div>', unsafe_allow_html=True)  # close btn + header
+    st.markdown('</div>', unsafe_allow_html=True)  # close header
 
     # report body
     st.markdown('<div class="cs-rpt-body">', unsafe_allow_html=True)
@@ -1902,34 +1911,27 @@ if st.session_state.stats:
 
     render_player_card()
 
-    # tab bar (rendered as a flex row of buttons)
-    st.markdown('<div class="cs-tabbar">', unsafe_allow_html=True)
-    render_tab_bar()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # tab content
-    st.markdown('<div class="cs-tab-content">', unsafe_allow_html=True)
-    tab = st.session_state.active_tab
-    if tab == 0:
+    # Native tab bar
+    _tab_labels = ["Resumo", "Visão Geral", "Erros", "Aberturas", "Relatório"]
+    _tabs = st.tabs(_tab_labels)
+    with _tabs[0]:
         render_tab_summary()
-    elif tab == 1:
+    with _tabs[1]:
         render_tab_overview()
-    elif tab == 2:
+    with _tabs[2]:
         render_tab_errors()
-    elif tab == 3:
+    with _tabs[3]:
         render_tab_openings()
-    elif tab == 4:
+    with _tabs[4]:
         render_tab_report()
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    # reset button
+    # Reset button
     st.markdown('<div class="cs-reset-wrap">', unsafe_allow_html=True)
-    st.markdown('<div class="btn-reset">', unsafe_allow_html=True)
-    if st.button("← Analisar outro jogador", key="reset_btn"):
+    if st.button("← Analisar outro jogador", key="reset_btn", type="secondary"):
         for k, v in _DEFAULTS.items():
             st.session_state[k] = v
         st.rerun()
-    st.markdown('</div></div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)  # close results-wrap
 
@@ -1953,6 +1955,7 @@ else:
         render_step_perspective()
     elif step == 3:
         render_step_gametype()
+    _inject_tile_js()   # wire HTML tile divs → backing buttons
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div></div>', unsafe_allow_html=True)  # close cs-main + cs-page
