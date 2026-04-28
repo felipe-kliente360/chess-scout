@@ -1,5 +1,9 @@
 # Chess Scout
 
+## Fluxo de trabalho Git
+
+**Sempre commitar e fazer push direto em `main`.** Este é um protótipo sem risco — não usar feature branches. Todo commit e deploy vai direto para main.
+
 Ferramenta de análise de jogadores do Chess.com que gera dois relatórios: diagnóstico do jogador e guia de como vencê-lo.
 
 ## Como rodar
@@ -44,9 +48,10 @@ O módulo `analyzer.py` detecta automaticamente o path do Stockfish no sistema.
 
 ```
 chess-scout/
-├── app.py              # Interface Streamlit
+├── app.py              # Interface Streamlit (lógica de app + wizard + resultados)
 ├── main.py             # Entry point CLI
 ├── modules/
+│   ├── ui.py           # Design system: DOSSIE, build_css, SVG/render helpers
 │   ├── fetcher.py      # Busca partidas na API do Chess.com
 │   ├── analyzer.py     # Analisa partidas com python-chess + Stockfish
 │   ├── stats.py        # Calcula estatísticas e padrões (inclui ACPL)
