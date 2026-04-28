@@ -6,7 +6,7 @@ import time
 from modules.fetcher import fetch_games
 from modules.analyzer import analyze_games
 from modules.stats import compute_stats
-from modules.reporter import generate_diagnostic, generate_opponent_guide, save_reports
+from modules.reporter import generate_diagnostic, generate_opponent_guide, save_reports, md_to_pdf
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -1237,14 +1237,20 @@ def render_player_card():
             f'</div>',
             unsafe_allow_html=True,
         )
-        md_data = (st.session_state.diagnostic_md
-                   if persp == "self"
-                   else st.session_state.guide_md)
-        fname   = (f"DIAGNOSTICO_{username}.md"
-                   if persp == "self"
-                   else f"GUIA_ADVERSARIO_{username}.md")
-        st.download_button("↓ Exportar", data=md_data,
-                           file_name=fname, mime="text/markdown",
+        md_data   = (st.session_state.diagnostic_md
+                     if persp == "self"
+                     else st.session_state.guide_md)
+        pdf_bytes = md_to_pdf(md_data)
+        if pdf_bytes:
+            fname    = (f"DIAGNOSTICO_{username}.pdf" if persp == "self" else f"GUIA_ADVERSARIO_{username}.pdf")
+            dl_data  = pdf_bytes
+            dl_mime  = "application/pdf"
+        else:
+            fname    = (f"DIAGNOSTICO_{username}.md" if persp == "self" else f"GUIA_ADVERSARIO_{username}.md")
+            dl_data  = md_data
+            dl_mime  = "text/markdown"
+        st.download_button("↓ Exportar", data=dl_data,
+                           file_name=fname, mime=dl_mime,
                            key="export_btn")
 
 
@@ -1787,9 +1793,18 @@ def render_tab_report():
     ttl_cls   = "cs-rpt-title-self" if is_self else "cs-rpt-title-opp"
     ttl_txt   = "♔ DIAGNÓSTICO PESSOAL" if is_self else "♚ GUIA DO ADVERSÁRIO"
     sub_txt   = f"Análise de {username}" if is_self else f"Como vencer {username}"
-    fname     = (f"DIAGNOSTICO_{username}.md" if is_self
-                 else f"GUIA_ADVERSARIO_{username}.md")
     md_data   = diag_md if is_self else guide_md
+    pdf_bytes = md_to_pdf(md_data)
+    if pdf_bytes:
+        fname    = (f"DIAGNOSTICO_{username}.pdf" if is_self else f"GUIA_ADVERSARIO_{username}.pdf")
+        dl_data  = pdf_bytes
+        dl_mime  = "application/pdf"
+        dl_label = "↓ .pdf"
+    else:
+        fname    = (f"DIAGNOSTICO_{username}.md" if is_self else f"GUIA_ADVERSARIO_{username}.md")
+        dl_data  = md_data
+        dl_mime  = "text/markdown"
+        dl_label = "↓ .md"
 
     st.markdown(
         f'<div class="cs-report-outer">'
@@ -1800,8 +1815,8 @@ def render_tab_report():
         f'</div>',
         unsafe_allow_html=True,
     )
-    st.download_button("↓ .md", data=md_data,
-                       file_name=fname, mime="text/markdown",
+    st.download_button(dl_label, data=dl_data,
+                       file_name=fname, mime=dl_mime,
                        key="rpt_dl_btn")
     st.markdown('</div>', unsafe_allow_html=True)  # close header
 

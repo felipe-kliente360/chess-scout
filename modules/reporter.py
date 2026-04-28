@@ -7,6 +7,47 @@ try:
 except ImportError:
     _HAS_ANTHROPIC = False
 
+try:
+    import markdown as _md_lib
+    import weasyprint as _weasyprint
+    _HAS_PDF = True
+except ImportError:
+    _HAS_PDF = False
+
+_PDF_CSS = """
+@page { margin: 2cm; }
+body { font-family: Georgia, serif; font-size: 11pt; line-height: 1.65; color: #1a1a1a; }
+h1 { font-size: 20pt; border-bottom: 2px solid #1a1a1a; padding-bottom: 6px; margin-bottom: 4px; }
+h2 { font-size: 14pt; margin-top: 22px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+h3 { font-size: 11.5pt; color: #333; margin-top: 14px; }
+p  { margin: 6px 0; }
+ul, ol { margin: 6px 0 6px 20px; }
+li { margin-bottom: 3px; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10pt; }
+th { background: #f0f0f0; padding: 6px 10px; text-align: left; border: 1px solid #bbb; font-weight: bold; }
+td { padding: 5px 10px; border: 1px solid #ddd; }
+tr:nth-child(even) td { background: #fafafa; }
+em { color: #555; }
+strong { color: #111; }
+hr { border: none; border-top: 1px solid #ddd; margin: 18px 0; }
+"""
+
+
+def md_to_pdf(md_text: str) -> bytes | None:
+    if not _HAS_PDF:
+        return None
+    try:
+        html_body = _md_lib.markdown(md_text, extensions=["tables", "fenced_code"])
+        html = (
+            "<!DOCTYPE html><html><head>"
+            "<meta charset='utf-8'>"
+            f"<style>{_PDF_CSS}</style>"
+            f"</head><body>{html_body}</body></html>"
+        )
+        return _weasyprint.HTML(string=html).write_pdf()
+    except Exception:
+        return None
+
 _SYSTEM = """Você é um analista de xadrez de elite especializado em construir relatórios profundos e acionáveis sobre jogadores de xadrez online.
 
 ESTILO:
@@ -660,12 +701,25 @@ def save_reports(username: str, diagnostic: str, opponent_guide: str, output_dir
     folder = os.path.join(output_dir, username)
     os.makedirs(folder, exist_ok=True)
 
-    diag_path = os.path.join(folder, "DIAGNOSTICO.md")
-    guide_path = os.path.join(folder, "GUIA_ADVERSARIO.md")
+    diag_pdf = md_to_pdf(diagnostic)
+    guide_pdf = md_to_pdf(opponent_guide)
 
-    with open(diag_path, "w", encoding="utf-8") as f:
-        f.write(diagnostic)
-    with open(guide_path, "w", encoding="utf-8") as f:
-        f.write(opponent_guide)
+    if diag_pdf:
+        diag_path = os.path.join(folder, "DIAGNOSTICO.pdf")
+        with open(diag_path, "wb") as f:
+            f.write(diag_pdf)
+    else:
+        diag_path = os.path.join(folder, "DIAGNOSTICO.md")
+        with open(diag_path, "w", encoding="utf-8") as f:
+            f.write(diagnostic)
+
+    if guide_pdf:
+        guide_path = os.path.join(folder, "GUIA_ADVERSARIO.pdf")
+        with open(guide_path, "wb") as f:
+            f.write(guide_pdf)
+    else:
+        guide_path = os.path.join(folder, "GUIA_ADVERSARIO.md")
+        with open(guide_path, "w", encoding="utf-8") as f:
+            f.write(opponent_guide)
 
     return diag_path, guide_path
