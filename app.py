@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import time
 
-from modules.fetcher import fetch_games, get_player_profile
+from modules.fetcher import fetch_games
 from modules.analyzer import analyze_games
 from modules.stats import compute_stats
 from modules.reporter import generate_diagnostic, generate_opponent_guide, save_reports
@@ -76,8 +76,6 @@ if analyze_btn and username_input:
     progress_bar.progress(5)
 
     try:
-        games_found = []
-
         def fetch_progress(found, target):
             pct = min(int(found / target * 25), 25)
             progress_bar.progress(5 + pct)
@@ -260,10 +258,12 @@ if "stats" in st.session_state:
         with col_w:
             st.subheader("Com Brancas")
             if openings_white:
-                best = max(openings_white, key=lambda x: x["win_rate"])
-                worst = min(openings_white, key=lambda x: x["win_rate"])
-                st.success(f"Melhor: {best['opening']} ({best['win_rate']:.1f}%)")
-                st.error(f"Pior: {worst['opening']} ({worst['win_rate']:.1f}%)")
+                best_w = stats.get("best_opening_white")
+                worst_w = stats.get("worst_opening_white")
+                if best_w:
+                    st.success(f"Melhor: {best_w['opening']} ({best_w['win_rate']:.1f}% em {best_w['games']} partidas)")
+                if worst_w:
+                    st.error(f"Pior: {worst_w['opening']} ({worst_w['win_rate']:.1f}% em {worst_w['games']} partidas)")
                 df_w = pd.DataFrame(openings_white)[["opening", "games", "win_rate"]]
                 df_w.columns = ["Abertura", "Partidas", "% Vitória"]
                 st.dataframe(df_w, use_container_width=True, hide_index=True)
@@ -271,10 +271,12 @@ if "stats" in st.session_state:
         with col_b:
             st.subheader("Com Pretas")
             if openings_black:
-                best = max(openings_black, key=lambda x: x["win_rate"])
-                worst = min(openings_black, key=lambda x: x["win_rate"])
-                st.success(f"Melhor: {best['opening']} ({best['win_rate']:.1f}%)")
-                st.error(f"Pior: {worst['opening']} ({worst['win_rate']:.1f}%)")
+                best_b = stats.get("best_opening_black")
+                worst_b = stats.get("worst_opening_black")
+                if best_b:
+                    st.success(f"Melhor: {best_b['opening']} ({best_b['win_rate']:.1f}% em {best_b['games']} partidas)")
+                if worst_b:
+                    st.error(f"Pior: {worst_b['opening']} ({worst_b['win_rate']:.1f}% em {worst_b['games']} partidas)")
                 df_b = pd.DataFrame(openings_black)[["opening", "games", "win_rate"]]
                 df_b.columns = ["Abertura", "Partidas", "% Vitória"]
                 st.dataframe(df_b, use_container_width=True, hide_index=True)

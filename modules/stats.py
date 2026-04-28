@@ -1,10 +1,17 @@
 from collections import defaultdict
-from typing import Optional
-import pandas as pd
 
 
 def _win_rate(wins: int, total: int) -> float:
     return round(wins / total * 100, 1) if total > 0 else 0.0
+
+
+def _best_worst_opening(openings: list[dict], min_games: int = 3) -> tuple[dict | None, dict | None]:
+    qualified = [o for o in openings if o["games"] >= min_games]
+    if not qualified:
+        qualified = openings
+    if not qualified:
+        return None, None
+    return max(qualified, key=lambda x: x["win_rate"]), min(qualified, key=lambda x: x["win_rate"])
 
 
 def compute_stats(games: list[dict], username: str) -> dict:
@@ -93,6 +100,9 @@ def compute_stats(games: list[dict], username: str) -> dict:
     current_rating = player_ratings[0] if player_ratings else None
     primary_time_class = max(by_time_class, key=lambda k: by_time_class[k]["total"]) if by_time_class else "unknown"
 
+    best_white, worst_white = _best_worst_opening(openings_white)
+    best_black, worst_black = _best_worst_opening(openings_black)
+
     return {
         "username": username,
         "total_games": total,
@@ -107,6 +117,10 @@ def compute_stats(games: list[dict], username: str) -> dict:
         "color_stats": color_stats,
         "openings_white": openings_white[:10],
         "openings_black": openings_black[:10],
+        "best_opening_white": best_white,
+        "worst_opening_white": worst_white,
+        "best_opening_black": best_black,
+        "worst_opening_black": worst_black,
         "error_stats": error_stats,
         "play_style": play_style,
     }
@@ -116,32 +130,25 @@ def _compute_error_stats(analyzed_games: list[dict]) -> dict:
     if not analyzed_games:
         return {}
 
-    totals = defaultdict(int)
-    phase_blunders = defaultdict(int)
+    totals: dict[str, int] = defaultdict(int)
+    phase_blunders: dict[str, int] = defaultdict(int)
     total_analyzed = len(analyzed_games)
 
     for g in analyzed_games:
         analysis = g.get("analysis", {})
-        counts = analysis.get("move_counts", {})
-        for k, v in counts.items():
+        for k, v in analysis.get("move_counts", {}).items():
             totals[k] += v
-        bp = analysis.get("blunders_by_phase", {})
-        for phase, count in bp.items():
+        for phase, count in analysis.get("blunders_by_phase", {}).items():
             phase_blunders[phase] += count
 
     averages = {k: round(v / total_analyzed, 2) for k, v in totals.items()}
 
-    total_blunders = totals.get("blunder", 0)
-    top_errors = []
-    if total_blunders:
-        top_errors.append({"type": "Blunder", "count": total_blunders, "avg_per_game": averages.get("blunder", 0)})
-    mistakes = totals.get("mistake", 0)
-    if mistakes:
-        top_errors.append({"type": "Erro", "count": mistakes, "avg_per_game": averages.get("mistake", 0)})
-    inaccuracies = totals.get("inaccuracy", 0)
-    if inaccuracies:
-        top_errors.append({"type": "Imprecisão", "count": inaccuracies, "avg_per_game": averages.get("inaccuracy", 0)})
-
+    top_errors = [
+        {"type": "Blunder",    "count": totals.get("blunder", 0),    "avg_por_partida": averages.get("blunder", 0)},
+        {"type": "Erro",       "count": totals.get("mistake", 0),    "avg_por_partida": averages.get("mistake", 0)},
+        {"type": "Imprecisão", "count": totals.get("inaccuracy", 0), "avg_por_partida": averages.get("inaccuracy", 0)},
+    ]
+    top_errors = [e for e in top_errors if e["count"] > 0]
     top_errors.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -158,25 +165,26 @@ def _compute_play_style(analyzed_games: list[dict], all_games: list[dict]) -> di
     wins = sum(1 for g in all_games if g["result"] == "win")
     losses = sum(1 for g in all_games if g["result"] == "loss")
 
-    conversion_tendency = "consistente"
-    if wins > 0:
-        if wins / max(total, 1) > 0.6:
-            conversion_tendency = "converte bem posições ganhas"
-        elif wins / max(total, 1) < 0.35:
-            conversion_tendency = "dificuldade em converter vantagem"
+    win_rate = wins / total if total else 0
+    if win_rate > 0.6:
+        conversion_tendency = "converte bem posições ganhas"
+    elif win_rate < 0.35:
+        conversion_tendency = "dificuldade em converter vantagem"
+    else:
+        conversion_tendency = "conversão consistente"
 
-    fighting_tendency = "equilibrado"
-    if losses > 0:
-        loss_rate = losses / total
-        if loss_rate > 0.5:
-            fighting_tendency = "tende a desistir rapidamente"
-        elif loss_rate < 0.25:
-            fighting_tendency = "luta até o fim"
+    loss_rate = losses / total if total else 0
+    if loss_rate > 0.5:
+        fighting_tendency = "tende a desistir rapidamente"
+    elif loss_rate < 0.25:
+        fighting_tendency = "luta até o fim"
+    else:
+        fighting_tendency = "equilibrado em posições perdidas"
 
-    avg_game_length = 0
+    avg_game_length = 0.0
     if analyzed_games:
         lengths = [g.get("analysis", {}).get("total_moves", 0) for g in analyzed_games]
-        avg_game_length = round(sum(lengths) / len(lengths), 1) if lengths else 0
+        avg_game_length = round(sum(lengths) / len(lengths), 1)
 
     style = "posicional" if avg_game_length > 35 else "agressivo"
 

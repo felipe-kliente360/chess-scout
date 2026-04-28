@@ -36,10 +36,10 @@ def generate_diagnostic(stats: dict, username: str) -> str:
     openings_white = stats.get("openings_white", [])
     openings_black = stats.get("openings_black", [])
 
-    best_white = max(openings_white, key=lambda x: x["win_rate"], default=None) if openings_white else None
-    worst_white = min(openings_white, key=lambda x: x["win_rate"], default=None) if openings_white else None
-    best_black = max(openings_black, key=lambda x: x["win_rate"], default=None) if openings_black else None
-    worst_black = min(openings_black, key=lambda x: x["win_rate"], default=None) if openings_black else None
+    best_white = stats.get("best_opening_white")
+    worst_white = stats.get("worst_opening_white")
+    best_black = stats.get("best_opening_black")
+    worst_black = stats.get("worst_opening_black")
 
     blunders_avg = averages.get("blunder", 0)
     mistakes_avg = averages.get("mistake", 0)
@@ -184,10 +184,10 @@ def generate_opponent_guide(stats: dict, username: str) -> str:
     top_blunder_phase = max(bp, key=lambda k: bp[k], default="middlegame") if bp else "middlegame"
     phase_pt = {"opening": "Abertura", "middlegame": "Meio de Jogo", "endgame": "Final de Jogo"}
 
-    worst_white = min(openings_white, key=lambda x: x["win_rate"], default=None) if openings_white else None
-    worst_black = min(openings_black, key=lambda x: x["win_rate"], default=None) if openings_black else None
-    best_white = max(openings_white, key=lambda x: x["win_rate"], default=None) if openings_white else None
-    best_black = max(openings_black, key=lambda x: x["win_rate"], default=None) if openings_black else None
+    best_white = stats.get("best_opening_white")
+    worst_white = stats.get("worst_opening_white")
+    best_black = stats.get("best_opening_black")
+    worst_black = stats.get("worst_opening_black")
 
     doc = f"""# Guia do Adversário — {username}
 _Gerado em {today}_

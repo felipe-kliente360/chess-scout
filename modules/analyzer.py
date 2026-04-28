@@ -51,20 +51,23 @@ def _get_game_phase(move_number: int) -> str:
     return "endgame"
 
 
-def _safe_score(score) -> Optional[int]:
-    if score is None:
+def _extract_cp(evaluation: dict, perspective_white: bool) -> Optional[int]:
+    if not evaluation:
         return None
-    if score.is_mate():
-        return 10000 if score.mate() > 0 else -10000
-    return score.score()
+    etype = evaluation.get("type")
+    value = evaluation.get("value", 0)
+    if etype == "cp":
+        return value if perspective_white else -value
+    if etype == "mate":
+        mate_val = 10000 if value > 0 else -10000
+        return mate_val if perspective_white else -mate_val
+    return None
 
 
-def analyze_game(pgn_str: str, username: str, stockfish_path: str) -> dict:
+def _analyze_game(pgn_str: str, username: str, sf: Stockfish) -> dict:
     game = chess.pgn.read_game(io.StringIO(pgn_str))
     if game is None:
         return {}
-
-    sf = Stockfish(path=stockfish_path, depth=DEPTH, parameters={"Threads": 1, "Hash": 64})
 
     board = game.board()
     moves_analysis = []
@@ -75,13 +78,11 @@ def analyze_game(pgn_str: str, username: str, stockfish_path: str) -> dict:
         is_white_turn = board.turn == chess.WHITE
 
         sf.set_fen_position(board.fen())
-        sf.get_best_move()
         eval_before = sf.get_evaluation()
 
         board.push(move)
 
         sf.set_fen_position(board.fen())
-        sf.get_best_move()
         eval_after = sf.get_evaluation()
 
         score_before = _extract_cp(eval_before, is_white_turn)
@@ -110,7 +111,7 @@ def analyze_game(pgn_str: str, username: str, stockfish_path: str) -> dict:
 
     counts = {k: 0 for k in MOVE_CLASSIFICATIONS}
     for m in player_moves:
-        counts[m["classification"]] = counts.get(m["classification"], 0) + 1
+        counts[m["classification"]] += 1
 
     blunders_by_phase = {"opening": 0, "middlegame": 0, "endgame": 0}
     for m in player_moves:
@@ -125,30 +126,18 @@ def analyze_game(pgn_str: str, username: str, stockfish_path: str) -> dict:
     }
 
 
-def _extract_cp(evaluation: dict, perspective_white: bool) -> Optional[int]:
-    if not evaluation:
-        return None
-    etype = evaluation.get("type")
-    value = evaluation.get("value", 0)
-    if etype == "cp":
-        return value if perspective_white else -value
-    if etype == "mate":
-        mate_val = 10000 if value > 0 else -10000
-        return mate_val if perspective_white else -mate_val
-    return None
-
-
 def analyze_games(
     games: list[dict],
     username: str,
     progress_callback=None,
 ) -> list[dict]:
     stockfish_path = _find_stockfish_path()
-    results = []
+    sf = Stockfish(path=stockfish_path, depth=DEPTH, parameters={"Threads": 1, "Hash": 64})
 
+    results = []
     for i, game in enumerate(games):
         try:
-            analysis = analyze_game(game["pgn"], username, stockfish_path)
+            analysis = _analyze_game(game["pgn"], username, sf)
             results.append({**game, "analysis": analysis})
         except Exception:
             results.append({**game, "analysis": {}})
