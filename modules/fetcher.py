@@ -9,11 +9,20 @@ HEADERS = {"User-Agent": "chess-scout/1.0 (github.com/chess-scout)"}
 CHESSCOM_BASE = "https://api.chess.com/pub/player"
 LICHESS_BASE  = "https://lichess.org/api"
 
-LICHESS_PERF_MAP = {
-    "blitz":    "blitz",
-    "rapid":    "rapid",
-    "bullet":   "bullet",
-    "classical": "classical",
+# category name → Chess.com time_class values
+CHESSCOM_CATEGORY: dict[str, set[str]] = {
+    "bullet":    {"bullet"},
+    "blitz":     {"blitz"},
+    "rapid":     {"rapid"},
+    "classical": {"daily"},
+}
+
+# category name → Lichess perfType string (API accepts comma-separated)
+LICHESS_CATEGORY: dict[str, str] = {
+    "bullet":    "bullet,ultraBullet",
+    "blitz":     "blitz",
+    "rapid":     "rapid",
+    "classical": "classical,correspondence",
 }
 
 
@@ -99,7 +108,7 @@ def _parse_chesscom(game: dict, username: str) -> Optional[dict]:
 def _fetch_chesscom(
     username: str,
     target: int = 100,
-    time_class_filter: Optional[str] = None,
+    time_class_filter: Optional[list[str]] = None,
     progress_callback=None,
 ) -> tuple[dict, list[dict]]:
     profile = _chesscom_profile(username)
@@ -107,11 +116,16 @@ def _fetch_chesscom(
     year, month = now.year, now.month
     games: list[dict] = []
 
+    allowed: set[str] = set()
+    if time_class_filter:
+        for cat in time_class_filter:
+            allowed.update(CHESSCOM_CATEGORY.get(cat, {cat}))
+
     for _ in range(24):
         if len(games) >= target:
             break
         for g in reversed(_chesscom_month(username, year, month)):
-            if time_class_filter and g.get("time_class") != time_class_filter:
+            if allowed and g.get("time_class") not in allowed:
                 continue
             parsed = _parse_chesscom(g, username)
             if parsed:
@@ -235,14 +249,17 @@ def _parse_lichess(game: dict, username: str) -> Optional[dict]:
 def _fetch_lichess(
     username: str,
     target: int = 100,
-    time_class_filter: Optional[str] = None,
+    time_class_filter: Optional[list[str]] = None,
     progress_callback=None,
 ) -> tuple[dict, list[dict]]:
     profile = _lichess_profile(username)
 
     params: dict = {"max": target, "opening": "true", "clocks": "true"}
     if time_class_filter:
-        params["perfType"] = LICHESS_PERF_MAP.get(time_class_filter, time_class_filter)
+        perf_parts: list[str] = []
+        for cat in time_class_filter:
+            perf_parts.append(LICHESS_CATEGORY.get(cat, cat))
+        params["perfType"] = ",".join(perf_parts)
 
     req_headers = {**HEADERS, "Accept": "application/x-ndjson"}
     try:
@@ -286,7 +303,7 @@ def _fetch_lichess(
 def fetch_games(
     username: str,
     target: int = 100,
-    time_class_filter: Optional[str] = None,
+    time_class_filter: Optional[list[str]] = None,
     platform: str = "lichess",
     progress_callback=None,
 ) -> tuple[dict, list[dict]]:

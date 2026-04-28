@@ -13,29 +13,44 @@ def print_step(step: str):
 
 def main():
     if len(sys.argv) < 2:
-        print("Uso: python main.py <username> [plataforma] [modalidade]")
+        print("Uso: python main.py <username> [plataforma] [tipos]")
         print()
         print("  plataforma : lichess (padrão) | chesscom")
-        print("  modalidade : blitz | rapid | bullet  (padrão: todas)")
+        print("  tipos      : bullet,blitz,rapid,classical  (padrão: todos)")
+        print("               separados por vírgula, sem espaço")
         print()
         print("Exemplos:")
         print("  python main.py DrNykterstein")
-        print("  python main.py DrNykterstein lichess blitz")
-        print("  python main.py magnuscarlsen chesscom")
+        print("  python main.py DrNykterstein lichess bullet,blitz")
+        print("  python main.py DrNykterstein lichess rapid")
+        print("  python main.py magnuscarlsen chesscom blitz,rapid")
         sys.exit(1)
 
-    username   = sys.argv[1]
-    platform   = sys.argv[2] if len(sys.argv) > 2 else "lichess"
-    time_class = sys.argv[3] if len(sys.argv) > 3 else None
+    username  = sys.argv[1]
+    platform  = sys.argv[2] if len(sys.argv) > 2 else "lichess"
+    tc_arg    = sys.argv[3] if len(sys.argv) > 3 else None
 
     if platform not in ("lichess", "chesscom"):
         print(f"Plataforma inválida: '{platform}'. Use 'lichess' ou 'chesscom'.")
         sys.exit(1)
 
+    VALID_CATS = {"bullet", "blitz", "rapid", "classical"}
+    time_class_filter: list[str] | None = None
+    if tc_arg:
+        cats = [c.strip() for c in tc_arg.split(",")]
+        invalid = [c for c in cats if c not in VALID_CATS]
+        if invalid:
+            print(f"Tipo(s) inválido(s): {', '.join(invalid)}")
+            print(f"Válidos: {', '.join(sorted(VALID_CATS))}")
+            sys.exit(1)
+        time_class_filter = cats
+
     platform_label = "Lichess" if platform == "lichess" else "Chess.com"
     print(f"\nChess Scout — {platform_label} — Analisando: {username}")
-    if time_class:
-        print(f"Modalidade: {time_class}")
+    if time_class_filter:
+        print(f"Tipos de partida: {', '.join(time_class_filter)}")
+    else:
+        print("Tipos de partida: todos")
 
     print_step("1/4 Buscando partidas...")
 
@@ -46,7 +61,7 @@ def main():
         profile, games = fetch_games(
             username,
             target=100,
-            time_class_filter=time_class,
+            time_class_filter=time_class_filter,
             platform=platform,
             progress_callback=fetch_progress,
         )

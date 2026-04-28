@@ -68,9 +68,19 @@ with st.sidebar:
         placeholder=PLATFORM_PLACEHOLDER[platform],
     )
 
-    time_class_options = {"Todas": None, "Blitz": "blitz", "Rapid": "rapid", "Bullet": "bullet"}
-    selected_tc = st.selectbox("Modalidade", list(time_class_options.keys()))
-    time_class_filter = time_class_options[selected_tc]
+    GAME_TYPES = {
+        "Bullet  (≤ 2 min)":   "bullet",
+        "Blitz   (3–5 min)":   "blitz",
+        "Rápida  (10–15 min)": "rapid",
+        "Clássica / Daily":    "classical",
+    }
+    selected_labels = st.multiselect(
+        "Tipos de partida",
+        options=list(GAME_TYPES.keys()),
+        default=["Bullet  (≤ 2 min)", "Blitz   (3–5 min)", "Rápida  (10–15 min)"],
+    )
+    selected_cats = [GAME_TYPES[l] for l in selected_labels]
+    time_class_filter = selected_cats if selected_cats else None
 
     analyze_btn = st.button("Analisar Jogador", type="primary", use_container_width=True)
 
